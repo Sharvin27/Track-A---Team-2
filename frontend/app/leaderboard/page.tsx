@@ -1,6 +1,10 @@
+"use client";
+
 import PageContainer from "@/components/layout/PageContainer";
 import SectionCard from "@/components/common/SectionCard";
 import PodiumCanvas from "@/components/leaderboard/PodiumCanvas";
+import GuestGate from "@/components/auth/GuestGate";
+import { useAuth } from "@/context/AuthContext";
 
 const TOP = [
   { rank: 1, name: "Priya Kapoor", flyers: 820, zones: 14, hours: 68, badge: "🥇", avatar: "PK", color: "#f5c842",  isYou: false },
@@ -24,6 +28,17 @@ const monthlyStats = [
 ];
 
 export default function LeaderboardPage() {
+  const { user, logout } = useAuth();
+
+  if (user?.isGuest) {
+    return (
+      <GuestGate
+        message="Login or sign up to access the leaderboard and see how you rank."
+        onGoToLogin={logout}
+      />
+    );
+  }
+
   return (
     <PageContainer>
 

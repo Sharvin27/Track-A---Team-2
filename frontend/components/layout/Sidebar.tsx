@@ -180,10 +180,7 @@ export default function Sidebar() {
 
       {/* ── Nav Items ── */}
       <nav style={{ flex: 1, padding: "0 10px", overflowY: "auto", position: "relative", zIndex: 1 }}>
-        {NAV.filter((item) => {
-          if (user?.isGuest && (item.href === "/profile" || item.href === "/leaderboard")) return false;
-          return true;
-        }).map((item) => {
+        {NAV.map((item) => {
           const isActive = pathname === item.href;
           const isHov = hovered === item.href;
 

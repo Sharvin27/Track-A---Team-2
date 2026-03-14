@@ -3,6 +3,7 @@
 import PageContainer from "@/components/layout/PageContainer";
 import SectionCard from "@/components/common/SectionCard";
 import StatCard from "@/components/common/StatCard";
+import GuestGate from "@/components/auth/GuestGate";
 import { useAuth } from "@/context/AuthContext";
 
 const stats = [
@@ -46,6 +47,16 @@ function formatJoined(createdAt: string | undefined): string {
 
 export default function ProfilePage() {
   const { user, logout } = useAuth();
+
+  if (user?.isGuest) {
+    return (
+      <GuestGate
+        message="Login or sign up to access your profile, stats, and badges."
+        onGoToLogin={logout}
+      />
+    );
+  }
+
   const displayName = user?.username ?? "Volunteer";
   const initial = getInitial(displayName);
 
