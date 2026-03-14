@@ -12,8 +12,9 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (loading) return;
     const isOnboarding = pathname === "/onboarding";
+    const isGetStarted = pathname === "/getstarted";
     if (!user) {
-      if (!isOnboarding) router.replace("/onboarding");
+      if (!isOnboarding && !isGetStarted) router.replace("/onboarding");
       return;
     }
     if (isOnboarding && (user.agreed_to_terms || user.isGuest)) {
