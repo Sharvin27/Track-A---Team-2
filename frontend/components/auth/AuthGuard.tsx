@@ -12,11 +12,15 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (loading) return;
     const isOnboarding = pathname === "/onboarding";
+    const isGetStarted = pathname === "/getstarted";
     if (!user) {
       if (!isOnboarding) router.replace("/onboarding");
+      if (isGetStarted) router.replace("/onboarding");
       return;
     }
-    // Let logged-in users stay on /onboarding to see "Get started volunteering" steps
+    if (isOnboarding && (user.agreed_to_terms || user.isGuest)) {
+      router.replace("/");
+    }
   }, [loading, user, pathname, router]);
 
   if (loading) {

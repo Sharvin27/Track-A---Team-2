@@ -61,7 +61,7 @@ const NAV = [
     ),
   },
   {
-    href: "/onboarding",
+    href: "/getstarted",
     label: "Get Started",
     isNew: true,
     icon: (
