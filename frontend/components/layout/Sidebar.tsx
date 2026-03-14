@@ -83,7 +83,7 @@ function getInitial(name: string): string {
 export default function Sidebar() {
   const pathname = usePathname();
   const [hovered, setHovered] = useState<string | null>(null);
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
 
   return (
     <aside
@@ -331,6 +331,38 @@ export default function Sidebar() {
             <circle cx="12" cy="5" r="1" /><circle cx="12" cy="12" r="1" /><circle cx="12" cy="19" r="1" />
           </svg>
         </Link>
+
+        {/* Guest CTA: switch to login/signup (effectively log guest out) */}
+        {user?.isGuest && (
+          <button
+            type="button"
+            onClick={() => logout()}
+            style={{
+              width: "100%",
+              marginTop: 10,
+              padding: "10px 12px",
+              borderRadius: 11,
+              border: "1px solid rgba(245,200,66,0.25)",
+              background: "rgba(245,200,66,0.08)",
+              color: "#f5c842",
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: "pointer",
+              transition: "background 0.18s, border-color 0.18s",
+              textAlign: "center",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "rgba(245,200,66,0.14)";
+              e.currentTarget.style.borderColor = "rgba(245,200,66,0.4)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "rgba(245,200,66,0.08)";
+              e.currentTarget.style.borderColor = "rgba(245,200,66,0.25)";
+            }}
+          >
+            Want to do more? Login or Sign up
+          </button>
+        )}
       </div>
     </aside>
   );
