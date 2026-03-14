@@ -17,7 +17,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         fontFamily: "'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif",
       }}
     >
-      {user && <Sidebar />}
+      {user?.agreed_to_terms && <Sidebar />}
       <div style={{ display: "flex", flexDirection: "column", flex: 1, overflow: "hidden", minWidth: 0 }}>
         <Header />
         <main style={{ flex: 1, overflowY: "auto", overflowX: "hidden" }}>
