@@ -10,8 +10,7 @@ const META: Record<string, { title: string; sub: string }> = {
   "/profile":     { title: "Your Profile ✨",    sub: "Track your volunteer contributions and impact." },
   "/leaderboard": { title: "Leaderboard 🏆",     sub: "Top volunteers making a difference this month." },
   "/printers":    { title: "Nearby Printers 🖨️", sub: "Find a printer close to you for your flyers." },
-  "/onboarding":  { title: "Log in",             sub: "Sign in or create an account to volunteer." },
-  "/getstarted": { title: "Get Started 🚀",     sub: "Everything you need to begin volunteering." },
+  "/onboarding":  { title: "Get Started 🚀",     sub: "Everything you need to begin volunteering." },
 };
 
 function getInitial(name: string): string {
