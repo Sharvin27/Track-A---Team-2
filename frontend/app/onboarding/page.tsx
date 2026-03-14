@@ -1,171 +1,360 @@
+"use client";
+
+import { useState } from "react";
 import Link from "next/link";
 import PageContainer from "@/components/layout/PageContainer";
-import SectionCard from "@/components/common/SectionCard";
+import { useAuth } from "@/context/AuthContext";
 
-const steps = [
-  {
-    step: "01", emoji: "📖",
-    title: "Learn About Flyering",
-    desc: "Understand what food resource flyering is and how it connects neighbors to free food programs, pantries, and community fridges near them.",
-    action: "Read the Guide", href: "#",
-    bg: "#fef9c3", border: "#fde68a", accent: "#d97706",
-  },
-  {
-    step: "02", emoji: "📄",
-    title: "Download Your Flyers",
-    desc: "Get printable flyers customized for your neighborhood. Available in English and Spanish. Just enter your area and we'll generate the right flyer.",
-    action: "Get Flyers", href: "https://www.foodhelpline.org/share",
-    bg: "#ede9fe", border: "#ddd6fe", accent: "#7c3aed",
-  },
-  {
-    step: "03", emoji: "🖨️",
-    title: "Find a Nearby Printer",
-    desc: "Use our printer locator to find the cheapest and most convenient place to print your flyers — from Staples to your local library.",
-    action: "Find Printers", href: "/printers",
-    bg: "#dcfce7", border: "#bbf7d0", accent: "#16a34a",
-  },
-  {
-    step: "04", emoji: "🚶",
-    title: "Start Volunteering",
-    desc: "Head out to your assigned zone, distribute flyers to residents, businesses, and community boards. Log your activity to earn points!",
-    action: "View the Map", href: "/map",
-    bg: "#fee2e2", border: "#fecaca", accent: "#dc2626",
-  },
-];
+const MISSION =
+  "Our mission is to connect neighbors with free food resources in their community. By distributing flyers and sharing information about pantries, community fridges, and food programs, we help reduce food insecurity one door at a time. We believe everyone deserves access to nutritious food and that volunteers like you are essential to making that happen.";
 
-const faqs = [
-  { q: "Do I need any experience?",               a: "No experience needed! All you need is enthusiasm. We'll provide flyers, maps, and guidance." },
-  { q: "How much time does it take?",              a: "Most volunteers spend 1–2 hours per session, on their own schedule." },
-  { q: "Can I volunteer in another language?",     a: "Yes! Our flyers are available in English and Spanish. More languages coming soon." },
-  { q: "What happens after I distribute flyers?",  a: "Log your activity to track your impact, earn badges, and show up on the leaderboard." },
-];
+type Step = "choice" | "login" | "signup" | "mission";
 
 export default function OnboardingPage() {
+  const { user, login, signup, agreeToTerms } = useAuth();
+  const [step, setStep] = useState<Step>("choice");
+  const [error, setError] = useState("");
+  const [agree, setAgree] = useState(false);
+
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+
+  const [signUsername, setSignUsername] = useState("");
+  const [signEmail, setSignEmail] = useState("");
+  const [signPassword, setSignPassword] = useState("");
+  const [signConfirm, setSignConfirm] = useState("");
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    try {
+      await login(loginEmail, loginPassword);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Login failed");
+    }
+  };
+
+  const handleSignup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    if (signPassword !== signConfirm) {
+      setError("Passwords do not match.");
+      return;
+    }
+    if (signPassword.length < 8) {
+      setError("Password must be at least 8 characters.");
+      return;
+    }
+    try {
+      await signup(signUsername, signEmail, signPassword);
+      setStep("mission");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Signup failed");
+    }
+  };
+
+  const handleContinue = async () => {
+    if (!agree) {
+      setError("Please agree to the terms to continue.");
+      return;
+    }
+    setError("");
+    try {
+      await agreeToTerms();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong.");
+    }
+  };
+
+  const cardStyle: React.CSSProperties = {
+    background: "#ffffff",
+    border: "1px solid rgba(190,155,70,0.18)",
+    borderRadius: 18,
+    boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+    padding: "32px 40px",
+    maxWidth: 440,
+    margin: "0 auto 24px",
+  };
+
+  const inputStyle: React.CSSProperties = {
+    width: "100%",
+    padding: "12px 14px",
+    borderRadius: 10,
+    border: "1px solid rgba(190,155,70,0.25)",
+    fontSize: 14,
+    color: "#1a1600",
+    marginBottom: 14,
+  };
+
+  const labelStyle: React.CSSProperties = {
+    display: "block",
+    fontSize: 12,
+    fontWeight: 600,
+    color: "#5a4a20",
+    marginBottom: 6,
+  };
+
+  const buttonPrimary: React.CSSProperties = {
+    width: "100%",
+    padding: "12px 20px",
+    borderRadius: 11,
+    border: "none",
+    background: "linear-gradient(135deg, #f5c842 0%, #e8a200 100%)",
+    color: "#1a1000",
+    fontSize: 14,
+    fontWeight: 700,
+    cursor: "pointer",
+    boxShadow: "0 3px 12px rgba(245,200,66,0.35)",
+  };
+
+  const buttonSecondary: React.CSSProperties = {
+    width: "100%",
+    padding: "12px 20px",
+    borderRadius: 11,
+    border: "1.5px solid rgba(190,155,70,0.35)",
+    background: "transparent",
+    color: "#5a4a20",
+    fontSize: 14,
+    fontWeight: 600,
+    cursor: "pointer",
+    marginTop: 8,
+  };
+
+  if (user && user.agreed_to_terms) {
+    return (
+      <PageContainer>
+        <div style={{ textAlign: "center", padding: 48 }}>
+          <p style={{ fontSize: 14, color: "#9a8a60" }}>Taking you to your dashboard…</p>
+        </div>
+      </PageContainer>
+    );
+  }
+
+  if (user && step === "mission") {
+    return (
+      <PageContainer>
+        <div
+          className="anim-fade-up d1"
+          style={{
+            position: "relative",
+            borderRadius: 20,
+            overflow: "hidden",
+            background: "linear-gradient(130deg, #f5c842 0%, #fbbf24 60%, #f59e0b 100%)",
+            boxShadow: "0 8px 32px rgba(245,200,66,0.35)",
+            padding: "40px 48px",
+            textAlign: "center",
+            marginBottom: 28,
+          }}
+        >
+          <div style={{ fontSize: 48, marginBottom: 12 }}>🍋</div>
+          <h2 style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 28, fontWeight: 700, color: "#1a1000", marginBottom: 8 }}>
+            One more step
+          </h2>
+          <p style={{ fontSize: 14, color: "rgba(60,40,0,0.7)", maxWidth: 420, margin: "0 auto" }}>
+            Please read our mission and agree to the terms to start volunteering.
+          </p>
+        </div>
+
+        <div className="anim-fade-up d2" style={cardStyle}>
+          <h3 style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 18, fontWeight: 700, color: "#1a1600", marginBottom: 16 }}>
+            Our mission
+          </h3>
+          <p style={{ fontSize: 14, color: "#5a4a20", lineHeight: 1.7, marginBottom: 24 }}>
+            {MISSION}
+          </p>
+          <label style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer", marginBottom: 20 }}>
+            <input
+              type="checkbox"
+              checked={agree}
+              onChange={(e) => setAgree(e.target.checked)}
+              style={{ width: 18, height: 18, marginTop: 2, accentColor: "#f5c842" }}
+            />
+            <span style={{ fontSize: 13, color: "#5a4a20" }}>
+              I agree to the terms of service and community guidelines.
+            </span>
+          </label>
+          {error && <p style={{ fontSize: 13, color: "#dc2626", marginBottom: 12 }}>{error}</p>}
+          <button type="button" style={buttonPrimary} onClick={handleContinue}>
+            Continue to dashboard
+          </button>
+        </div>
+      </PageContainer>
+    );
+  }
+
+  if (step === "login") {
+    return (
+      <PageContainer>
+        <div className="anim-fade-up d1" style={{ textAlign: "center", marginBottom: 24 }}>
+          <h2 style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 26, fontWeight: 700, color: "#1a1000" }}>
+            Log in
+          </h2>
+          <p style={{ fontSize: 14, color: "#9a8a60", marginTop: 6 }}>Welcome back to Lemontree.</p>
+        </div>
+        <div className="anim-fade-up d2" style={cardStyle}>
+          <form onSubmit={handleLogin}>
+            <label style={labelStyle}>Email</label>
+            <input
+              type="email"
+              value={loginEmail}
+              onChange={(e) => setLoginEmail(e.target.value)}
+              style={inputStyle}
+              placeholder="you@example.com"
+              required
+              autoComplete="email"
+            />
+            <label style={labelStyle}>Password</label>
+            <input
+              type="password"
+              value={loginPassword}
+              onChange={(e) => setLoginPassword(e.target.value)}
+              style={inputStyle}
+              placeholder="••••••••"
+              required
+              autoComplete="current-password"
+            />
+            {error && <p style={{ fontSize: 13, color: "#dc2626", marginBottom: 12 }}>{error}</p>}
+            <button type="submit" style={buttonPrimary}>
+              Log in
+            </button>
+            <button type="button" style={buttonSecondary} onClick={() => { setStep("choice"); setError(""); }}>
+              Back
+            </button>
+          </form>
+        </div>
+      </PageContainer>
+    );
+  }
+
+  if (step === "signup") {
+    return (
+      <PageContainer>
+        <div className="anim-fade-up d1" style={{ textAlign: "center", marginBottom: 24 }}>
+          <h2 style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 26, fontWeight: 700, color: "#1a1000" }}>
+            Create an account
+          </h2>
+          <p style={{ fontSize: 14, color: "#9a8a60", marginTop: 6 }}>Join the Lemontree volunteer community.</p>
+        </div>
+        <div className="anim-fade-up d2" style={cardStyle}>
+          <form onSubmit={handleSignup}>
+            <label style={labelStyle}>Username</label>
+            <input
+              type="text"
+              value={signUsername}
+              onChange={(e) => setSignUsername(e.target.value)}
+              style={inputStyle}
+              placeholder="johndoe"
+              required
+              autoComplete="username"
+            />
+            <label style={labelStyle}>Email</label>
+            <input
+              type="email"
+              value={signEmail}
+              onChange={(e) => setSignEmail(e.target.value)}
+              style={inputStyle}
+              placeholder="you@example.com"
+              required
+              autoComplete="email"
+            />
+            <label style={labelStyle}>Password</label>
+            <input
+              type="password"
+              value={signPassword}
+              onChange={(e) => setSignPassword(e.target.value)}
+              style={inputStyle}
+              placeholder="At least 8 characters"
+              required
+              minLength={8}
+              autoComplete="new-password"
+            />
+            <label style={labelStyle}>Confirm password</label>
+            <input
+              type="password"
+              value={signConfirm}
+              onChange={(e) => setSignConfirm(e.target.value)}
+              style={inputStyle}
+              placeholder="••••••••"
+              required
+              autoComplete="new-password"
+            />
+            {error && <p style={{ fontSize: 13, color: "#dc2626", marginBottom: 12 }}>{error}</p>}
+            <button type="submit" style={buttonPrimary}>
+              Sign up
+            </button>
+            <button type="button" style={buttonSecondary} onClick={() => { setStep("choice"); setError(""); }}>
+              Back
+            </button>
+          </form>
+        </div>
+      </PageContainer>
+    );
+  }
+
   return (
     <PageContainer>
-
-      {/* ── Hero ──────────────────────────────────────────────── */}
       <div
         className="anim-fade-up d1"
         style={{
-          position: "relative", borderRadius: 20, overflow: "hidden",
+          position: "relative",
+          borderRadius: 20,
+          overflow: "hidden",
           background: "linear-gradient(130deg, #f5c842 0%, #fbbf24 60%, #f59e0b 100%)",
           boxShadow: "0 8px 32px rgba(245,200,66,0.35)",
-          padding: "48px 56px", textAlign: "center", marginBottom: 28,
+          padding: "48px 56px",
+          textAlign: "center",
+          marginBottom: 28,
         }}
       >
-        <div style={{ position: "absolute", top: -40, right: -40, width: 200, height: 200, borderRadius: "50%", background: "rgba(255,255,255,0.12)", pointerEvents: "none" }} />
-        <div style={{ position: "absolute", bottom: -50, left: -30, width: 160, height: 160, borderRadius: "50%", background: "rgba(255,255,255,0.08)", pointerEvents: "none" }} />
-        <div className="anim-float" style={{ fontSize: 52, marginBottom: 14, lineHeight: 1 }}>🍋</div>
+        <div style={{ fontSize: 52, marginBottom: 14 }}>🍋</div>
         <h2 style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 34, fontWeight: 700, color: "#1a1000", letterSpacing: "-0.8px", marginBottom: 10 }}>
           Welcome to the Hub
         </h2>
-        <p style={{ fontSize: 14.5, color: "rgba(60,40,0,0.65)", maxWidth: 480, margin: "0 auto" }}>
-          Flyering is one of the simplest ways to help. A single flyer can connect a family to food.
-          Here&rsquo;s how to get started in 4 easy steps.
+        <p style={{ fontSize: 14.5, color: "rgba(60,40,0,0.65)", maxWidth: 480, margin: "0 auto 28px" }}>
+          Get started by logging in or creating an account.
         </p>
-      </div>
-
-      {/* ── Steps ─────────────────────────────────────────────── */}
-      <div
-        className="anim-fade-up d2"
-        style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 24 }}
-      >
-        {steps.map((s) => (
-          <div
-            key={s.step}
+        <div style={{ display: "flex", gap: 16, justifyContent: "center", flexWrap: "wrap" }}>
+          <button
+            type="button"
+            onClick={() => setStep("login")}
             style={{
-              padding: "24px 26px", borderRadius: 18,
-              background: s.bg,
-              border: `1.5px solid ${s.border}`,
-              boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+              padding: "14px 28px",
+              borderRadius: 12,
+              border: "none",
+              background: "rgba(18,12,0,0.84)",
+              color: "#f5c842",
+              fontSize: 14,
+              fontWeight: 700,
+              cursor: "pointer",
+              boxShadow: "0 3px 12px rgba(0,0,0,0.22)",
             }}
           >
-            <div style={{ display: "flex", alignItems: "flex-start", gap: 16 }}>
-              {/* Emoji box */}
-              <div style={{ width: 48, height: 48, borderRadius: 14, background: "#ffffff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0, boxShadow: "0 2px 8px rgba(0,0,0,0.07)" }}>
-                {s.emoji}
-              </div>
-              <div style={{ flex: 1 }}>
-                <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: s.accent, marginBottom: 5 }}>
-                  STEP {s.step}
-                </p>
-                <h3 style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 16.5, fontWeight: 700, color: "#1a1600", letterSpacing: "-0.3px", marginBottom: 8 }}>
-                  {s.title}
-                </h3>
-                <p style={{ fontSize: 13, color: "#5a4a20", lineHeight: 1.6, marginBottom: 14 }}>
-                  {s.desc}
-                </p>
-                {s.href.startsWith("http") ? (
-                  <a
-                    href={s.href}
-                    target="_blank"
-                    rel="noreferrer"
-                    style={{ fontSize: 13, fontWeight: 600, color: s.accent, textDecoration: "none" }}
-                  >
-                    {s.action} →
-                  </a>
-                ) : (
-                  <Link href={s.href} style={{ fontSize: 13, fontWeight: 600, color: s.accent, textDecoration: "none" }}>
-                    {s.action} →
-                  </Link>
-                )}
-              </div>
-            </div>
-          </div>
-        ))}
+            Log in
+          </button>
+          <button
+            type="button"
+            onClick={() => setStep("signup")}
+            style={{
+              padding: "14px 28px",
+              borderRadius: 12,
+              border: "2px solid rgba(18,12,0,0.5)",
+              background: "rgba(255,255,255,0.9)",
+              color: "#1a1000",
+              fontSize: 14,
+              fontWeight: 700,
+              cursor: "pointer",
+            }}
+          >
+            Sign up
+          </button>
+        </div>
       </div>
 
-      {/* ── FAQ ───────────────────────────────────────────────── */}
-      <SectionCard
-        title="Common Questions"
-        subtitle="Everything you need to know before you start"
-        style={{ marginBottom: 24 }}
-      >
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px 40px" }}>
-          {faqs.map((faq, i) => (
-            <div key={i} style={{ padding: "14px 0", borderBottom: i < 2 ? "1px solid rgba(190,155,70,0.12)" : "none" }}>
-              <p style={{ fontSize: 13.5, fontWeight: 600, color: "#1a1600", marginBottom: 5 }}>{faq.q}</p>
-              <p style={{ fontSize: 13, color: "#7a6a40", lineHeight: 1.6 }}>{faq.a}</p>
-            </div>
-          ))}
-        </div>
-      </SectionCard>
-
-      {/* ── CTA ───────────────────────────────────────────────── */}
-      <div
-        className="anim-fade-up d4"
-        style={{
-          display: "flex", alignItems: "center", justifyContent: "space-between",
-          padding: "22px 32px", borderRadius: 18,
-          background: "linear-gradient(120deg, #1a1200 55%, #2c1e00 100%)",
-          border: "1px solid rgba(245,200,66,0.14)",
-          boxShadow: "0 4px 24px rgba(0,0,0,0.14)",
-        }}
-      >
-        <div>
-          <h4 style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 16, fontWeight: 700, color: "#f5c842", letterSpacing: "-0.3px", marginBottom: 4 }}>
-            Ready to make a difference?
-          </h4>
-          <p style={{ fontSize: 12.5, color: "rgba(237,218,170,0.5)" }}>
-            Join 37 active volunteers — find your first flyering zone today.
-          </p>
-        </div>
-        <Link
-          href="/map"
-          style={{
-            flexShrink: 0, display: "flex", alignItems: "center", gap: 8,
-            padding: "11px 24px", borderRadius: 12,
-            background: "#f5c842", color: "#1a1000",
-            fontSize: 13, fontWeight: 700,
-            boxShadow: "0 4px 16px rgba(245,200,66,0.32)",
-            textDecoration: "none",
-          }}
-        >
-          🗺️ Find My First Zone
-        </Link>
+      <div className="anim-fade-up d2" style={{ textAlign: "center" }}>
+        <p style={{ fontSize: 13, color: "#9a8a60" }}>
+          New here? <Link href="/onboarding" style={{ color: "#d97706", fontWeight: 600 }} onClick={(e) => { e.preventDefault(); setStep("signup"); }}>Sign up</Link> to volunteer and track your impact.
+        </p>
       </div>
-
     </PageContainer>
   );
 }

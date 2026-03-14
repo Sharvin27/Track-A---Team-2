@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
+import { useAuth } from "@/context/AuthContext";
 
 const NAV = [
   {
@@ -73,9 +74,16 @@ const NAV = [
   },
 ];
 
+function getInitial(name: string): string {
+  if (!name?.trim()) return "?";
+  const first = name.trim()[0];
+  return first.toUpperCase();
+}
+
 export default function Sidebar() {
   const pathname = usePathname();
   const [hovered, setHovered] = useState<string | null>(null);
+  const { user } = useAuth();
 
   return (
     <aside
@@ -276,7 +284,8 @@ export default function Sidebar() {
 
       {/* ── User Footer ── */}
       <div style={{ padding: "0 10px 20px", position: "relative", zIndex: 1 }}>
-        <div
+        <Link
+          href="/profile"
           style={{
             display: "flex",
             alignItems: "center",
@@ -286,6 +295,8 @@ export default function Sidebar() {
             background: "rgba(255,255,255,0.04)",
             cursor: "pointer",
             transition: "background 0.18s",
+            textDecoration: "none",
+            color: "inherit",
           }}
           onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.08)"; }}
           onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.04)"; }}
@@ -303,20 +314,20 @@ export default function Sidebar() {
             color: "#1a1000",
             flexShrink: 0,
           }}>
-            SG
+            {user ? getInitial(user.username) : "?"}
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 12.5, fontWeight: 600, color: "#ede5cc", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              Sharvin Gavad
+              {user ? user.username : "Guest"}
             </div>
             <div style={{ fontSize: 10.5, color: "rgba(237,229,204,0.38)", marginTop: 1 }}>
-              Hackathon 2025
+              {user ? "Volunteer" : "Log in to get started"}
             </div>
           </div>
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="rgba(237,229,204,0.35)" strokeWidth="2">
             <circle cx="12" cy="5" r="1" /><circle cx="12" cy="12" r="1" /><circle cx="12" cy="19" r="1" />
           </svg>
-        </div>
+        </Link>
       </div>
     </aside>
   );
