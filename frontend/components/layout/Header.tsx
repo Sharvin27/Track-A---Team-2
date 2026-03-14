@@ -124,7 +124,7 @@ export default function Header() {
 
         {/* Avatar */}
         <Link
-          href="/profile"
+          href={user?.isGuest ? "/" : "/profile"}
           style={{
             width: 36,
             height: 36,

@@ -180,7 +180,10 @@ export default function Sidebar() {
 
       {/* ── Nav Items ── */}
       <nav style={{ flex: 1, padding: "0 10px", overflowY: "auto", position: "relative", zIndex: 1 }}>
-        {NAV.map((item) => {
+        {NAV.filter((item) => {
+          if (user?.isGuest && (item.href === "/profile" || item.href === "/leaderboard")) return false;
+          return true;
+        }).map((item) => {
           const isActive = pathname === item.href;
           const isHov = hovered === item.href;
 
@@ -285,7 +288,7 @@ export default function Sidebar() {
       {/* ── User Footer ── */}
       <div style={{ padding: "0 10px 20px", position: "relative", zIndex: 1 }}>
         <Link
-          href="/profile"
+          href={user?.isGuest ? "/" : "/profile"}
           style={{
             display: "flex",
             alignItems: "center",
@@ -321,7 +324,7 @@ export default function Sidebar() {
               {user ? user.username : "Guest"}
             </div>
             <div style={{ fontSize: 10.5, color: "rgba(237,229,204,0.38)", marginTop: 1 }}>
-              {user ? "Volunteer" : "Log in to get started"}
+              {user?.isGuest ? "Guest" : user ? "Volunteer" : "Log in to get started"}
             </div>
           </div>
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="rgba(237,229,204,0.35)" strokeWidth="2">

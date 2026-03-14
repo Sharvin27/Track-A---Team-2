@@ -6,6 +6,7 @@ export type User = {
   email: string;
   agreed_to_terms: boolean;
   created_at: string;
+  isGuest?: boolean;
 };
 
 export async function signup(

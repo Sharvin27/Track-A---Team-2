@@ -11,7 +11,7 @@ const MISSION =
 type Step = "choice" | "login" | "signup" | "mission";
 
 export default function OnboardingPage() {
-  const { user, login, signup, agreeToTerms } = useAuth();
+  const { user, login, signup, signInAsGuest, agreeToTerms } = useAuth();
   const [step, setStep] = useState<Step>("choice");
   const [error, setError] = useState("");
   const [agree, setAgree] = useState(false);
@@ -120,7 +120,7 @@ export default function OnboardingPage() {
     marginTop: 8,
   };
 
-  if (user && user.agreed_to_terms) {
+  if (user && (user.agreed_to_terms || user.isGuest)) {
     return (
       <PageContainer>
         <div style={{ textAlign: "center", padding: 48 }}>
@@ -346,6 +346,22 @@ export default function OnboardingPage() {
             }}
           >
             Sign up
+          </button>
+          <button
+            type="button"
+            onClick={signInAsGuest}
+            style={{
+              padding: "14px 28px",
+              borderRadius: 12,
+              border: "1.5px solid rgba(190,155,70,0.4)",
+              background: "transparent",
+              color: "#5a4a20",
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+          >
+            Continue as guest
           </button>
         </div>
       </div>

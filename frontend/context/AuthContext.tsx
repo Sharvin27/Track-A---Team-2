@@ -5,15 +5,27 @@ import { useRouter } from "next/navigation";
 import * as authApi from "@/lib/auth-api";
 
 const TOKEN_KEY = "lemontree_token";
+const GUEST_KEY = "lemontree_guest";
 
 type User = authApi.User;
+
+export const GUEST_USER: User = {
+  id: 0,
+  username: "Guest User",
+  email: "",
+  agreed_to_terms: true,
+  created_at: "",
+  isGuest: true,
+};
 
 type AuthContextValue = {
   user: User | null;
   token: string | null;
   loading: boolean;
+  isGuest: boolean;
   login: (email: string, password: string) => Promise<void>;
   signup: (username: string, email: string, password: string) => Promise<void>;
+  signInAsGuest: () => void;
   logout: () => void;
   agreeToTerms: () => Promise<void>;
   setUser: (u: User | null) => void;
@@ -38,20 +50,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const loadUser = useCallback(async () => {
     if (typeof window === "undefined") return;
     const stored = localStorage.getItem(TOKEN_KEY);
-    if (!stored) {
-      setLoading(false);
+    if (stored) {
+      setTokenState(stored);
+      try {
+        const { user: u } = await authApi.me(stored);
+        setUser(u);
+      } catch {
+        setToken(null);
+        setUser(null);
+      } finally {
+        setLoading(false);
+      }
       return;
     }
-    setTokenState(stored);
-    try {
-      const { user: u } = await authApi.me(stored);
-      setUser(u);
-    } catch {
-      setToken(null);
-      setUser(null);
-    } finally {
-      setLoading(false);
+    if (localStorage.getItem(GUEST_KEY)) {
+      setUser(GUEST_USER);
     }
+    setLoading(false);
   }, []);
 
   useEffect(() => {
@@ -78,9 +93,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [setToken]
   );
 
+  const signInAsGuest = useCallback(() => {
+    setToken(null);
+    setUser(GUEST_USER);
+    if (typeof window !== "undefined") localStorage.setItem(GUEST_KEY, "1");
+    router.push("/");
+  }, [router]);
+
   const logout = useCallback(() => {
     setToken(null);
     setUser(null);
+    if (typeof window !== "undefined") localStorage.removeItem(GUEST_KEY);
     router.push("/onboarding");
   }, [router, setToken]);
 
@@ -95,8 +118,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     user,
     token,
     loading,
+    isGuest: !!user?.isGuest,
     login,
     signup,
+    signInAsGuest,
     logout,
     agreeToTerms,
     setUser,

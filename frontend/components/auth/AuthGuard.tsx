@@ -16,7 +16,11 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
       if (!isOnboarding) router.replace("/onboarding");
       return;
     }
-    if (isOnboarding && user.agreed_to_terms) {
+    if (isOnboarding && (user.agreed_to_terms || user.isGuest)) {
+      router.replace("/");
+    }
+    const guestRestrictedPaths = ["/profile", "/leaderboard"];
+    if (user.isGuest && guestRestrictedPaths.includes(pathname)) {
       router.replace("/");
     }
   }, [loading, user, pathname, router]);
