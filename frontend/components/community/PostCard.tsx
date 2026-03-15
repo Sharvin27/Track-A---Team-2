@@ -208,10 +208,10 @@ export default function PostCard({
                 height: 42,
                 borderRadius: 14,
                 border: `1px solid ${
-                  post.viewerHasLiked ? "rgba(34,197,94,0.2)" : "var(--border-subtle)"
+                  post.viewerHasLiked ? "rgba(245,200,66,0.3)" : "var(--border-subtle)"
                 }`,
-                background: post.viewerHasLiked ? "rgba(236,253,245,0.92)" : "#ffffff",
-                color: post.viewerHasLiked ? "#166534" : "var(--text-muted)",
+                background: post.viewerHasLiked ? "rgba(255,248,230,0.92)" : "#ffffff",
+                color: post.viewerHasLiked ? "#7a5200" : "var(--text-muted)",
                 fontSize: 18,
                 fontWeight: 900,
                 opacity: !token || isGuest ? 0.6 : 1,
@@ -262,7 +262,7 @@ export default function PostCard({
                     gap: 6,
                     padding: "5px 9px",
                     borderRadius: 999,
-                    background: post.meetup ? "rgba(34,197,94,0.12)" : "rgba(245,200,66,0.14)",
+                    background: post.meetup ? "rgba(34,197,94,0.12)" : "var(--accent-amber-muted)",
                     color: post.meetup ? "#166534" : "#7a5200",
                     fontSize: 10.5,
                     fontWeight: 800,
@@ -388,11 +388,11 @@ export default function PostCard({
                 onClick={() => void handleLikeToggle()}
                 style={{
                   ...reactionButtonStyle,
-                  color: post.viewerHasLiked ? "#166534" : "#5f502d",
+                  color: post.viewerHasLiked ? "#7a5200" : "#5f502d",
                   borderColor: post.viewerHasLiked
-                    ? "rgba(34,197,94,0.24)"
+                    ? "rgba(245,200,66,0.3)"
                     : "rgba(190,155,70,0.18)",
-                  background: post.viewerHasLiked ? "rgba(236,253,245,0.9)" : "#fffdf7",
+                  background: post.viewerHasLiked ? "rgba(255,248,230,0.9)" : "#fffdf7",
                   opacity: !token || isGuest ? 0.55 : 1,
                 }}
               >

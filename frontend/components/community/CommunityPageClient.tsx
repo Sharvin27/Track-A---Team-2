@@ -196,8 +196,8 @@ export default function CommunityPageClient() {
                       gap: 8,
                       padding: "5px 10px",
                       borderRadius: 999,
-                      background: "var(--accent-green-muted)",
-                      color: "#166534",
+                      background: "var(--accent-amber-muted)",
+                      color: "#7a5200",
                       fontSize: 11,
                       fontWeight: 700,
                       letterSpacing: "0.08em",
@@ -433,7 +433,7 @@ function IconActionButton({
     green: {
       background: "var(--gradient-btn-primary)",
       color: "#ffffff",
-      borderColor: "rgba(34,197,94,0.24)",
+      borderColor: "rgba(245,200,66,0.24)",
     },
     amber: {
       background: "linear-gradient(135deg, #F59E0B, #D97706)",
@@ -487,10 +487,10 @@ function LoadingFeed() {
             gap: 12,
           }}
         >
-          <div style={{ width: 180, height: 14, borderRadius: 999, background: "rgba(0,0,0,0.08)" }} />
-          <div style={{ width: "68%", height: 22, borderRadius: 999, background: "rgba(0,0,0,0.12)" }} />
-          <div style={{ width: "100%", height: 12, borderRadius: 999, background: "rgba(0,0,0,0.07)" }} />
-          <div style={{ width: "84%", height: 12, borderRadius: 999, background: "rgba(0,0,0,0.07)" }} />
+          <div className="anim-shimmer" style={{ width: 180, height: 14, borderRadius: 999 }} />
+          <div className="anim-shimmer" style={{ width: "68%", height: 22, borderRadius: 999 }} />
+          <div className="anim-shimmer" style={{ width: "100%", height: 12, borderRadius: 999 }} />
+          <div className="anim-shimmer" style={{ width: "84%", height: 12, borderRadius: 999 }} />
         </div>
       ))}
     </div>

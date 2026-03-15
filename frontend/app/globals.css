@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,400&family=Playfair+Display:wght@600;700;800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,400&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap');
 
 @import "tailwindcss/preflight";
 @tailwind utilities;
@@ -16,13 +16,15 @@
   --border-subtle: rgba(0, 0, 0, 0.07);
   --accent-green: #4ADE80;
   --accent-green-muted: #D1FAE5;
-  --accent-amber: #F59E0B;
+  --accent-amber: #f5c842;
+  --accent-amber-muted: rgba(245,200,66,0.15);
   --text-primary: #111111;
   --text-muted: #6B7280;
-  --sidebar-bg: #141414;
-  --sidebar-text: #E5E5E5;
+  --sidebar-bg: rgba(15, 12, 5, 0.80);
+  --sidebar-text: #ede5cc;
+  --sidebar-accent: #f5c842;
   --gradient-hero: linear-gradient(135deg, #F0FDF4 0%, #FAFAF7 60%, #FEF9EE 100%);
-  --gradient-btn-primary: linear-gradient(135deg, #22C55E, #16A34A);
+  --gradient-btn-primary: linear-gradient(135deg, #f5c842 0%, #e8a200 100%);
   --gradient-meetup-card: linear-gradient(145deg, #F0FDF4, #DCFCE7);
   --shadow-card: 0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04);
   --shadow-hover: 0 4px 20px rgba(0,0,0,0.10);
@@ -115,6 +117,22 @@ input, select, textarea {
   100% { opacity: 1; transform: scale(1) translateY(0); }
 }
 
+@keyframes shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+
+@keyframes fabEntrance {
+  0%   { opacity: 0; transform: scale(0.5) translateY(20px); }
+  60%  { opacity: 1; transform: scale(1.08) translateY(-2px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+@keyframes fabIdle {
+  0%, 100% { box-shadow: 0 4px 18px rgba(245,200,66,0.45); }
+  50%      { box-shadow: 0 4px 24px rgba(245,200,66,0.65), 0 0 0 6px rgba(245,200,66,0.08); }
+}
+
 .anim-fade-up {
   animation: fadeUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
@@ -126,6 +144,14 @@ input, select, textarea {
 }
 .pulse-dot {
   animation: pulseDot 2s ease-in-out infinite;
+}
+.anim-shimmer {
+  background: linear-gradient(90deg, rgba(0,0,0,0.06) 25%, rgba(0,0,0,0.10) 50%, rgba(0,0,0,0.06) 75%);
+  background-size: 800px 100%;
+  animation: shimmer 1.8s ease-in-out infinite;
+}
+.anim-fab-entrance {
+  animation: fabEntrance 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.8s both, fabIdle 3s ease-in-out 2s infinite;
 }
 
 .meetup-marker-ring {
@@ -233,23 +259,25 @@ input, select, textarea {
 .nav-item {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 9px 14px;
-  border-radius: 8px;
-  font-size: 13px;
-  color: #A1A1AA;
+  gap: 11px;
+  padding: 10px 12px;
+  border-radius: 11px;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: rgba(237,229,204,0.7);
   cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease;
+  transition: background 0.18s ease, color 0.15s ease;
+  letter-spacing: -0.1px;
 }
 
 .nav-item:hover {
-  background: rgba(255,255,255,0.07);
-  color: #FFFFFF;
+  background: rgba(245,200,66,0.08);
+  color: #ede5cc;
 }
 
 .nav-item.active {
-  background: rgba(74, 222, 128, 0.15);
-  color: #4ADE80;
+  background: rgba(245,200,66,0.16);
+  color: #f5c842;
   font-weight: 600;
 }
 
@@ -262,7 +290,7 @@ input, select, textarea {
 }
 
 .community-hero h1 {
-  font-family: 'Playfair Display', serif;
+  font-family: 'Fraunces', Georgia, serif;
   font-size: 2rem;
   line-height: 1.2;
   color: #111;
@@ -305,6 +333,11 @@ input, select, textarea {
 .meetup-row {
   padding: 12px 0;
   border-bottom: 1px solid var(--border-subtle);
+  transition: background 0.15s ease;
+}
+
+.meetup-row:hover {
+  background: rgba(0,0,0,0.015);
 }
 
 .meetup-row:last-child {
@@ -312,7 +345,7 @@ input, select, textarea {
 }
 
 .btn-leave {
-  background: var(--gradient-btn-primary);
+  background: linear-gradient(135deg, #22C55E, #16A34A);
   color: white;
   border: none;
   border-radius: 6px;
@@ -337,8 +370,8 @@ input, select, textarea {
 }
 
 .btn-ghost:hover {
-  border-color: #4ADE80;
-  color: #16A34A;
+  border-color: #f5c842;
+  color: #d97706;
 }
 
 .community-soft-card {
@@ -346,4 +379,10 @@ input, select, textarea {
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-card);
   box-shadow: var(--shadow-card);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.community-soft-card:hover {
+  box-shadow: var(--shadow-hover);
+  transform: translateY(-1px);
 }

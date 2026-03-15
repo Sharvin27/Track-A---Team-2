@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useMemo, useRef } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   GeoJSON,
   MapContainer,
@@ -267,7 +267,6 @@ export default function OutreachMapCanvas({
       />
     </MapContainer>
   );
-  return null;
 }
 
 function LocationMarkers({
@@ -282,10 +281,28 @@ function LocationMarkers({
   onSelect: (id: string) => void;
 }) {
   const map = useMap();
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    // Wait until the map container is fully initialized
+    const check = () => {
+      try {
+        map.getZoom();
+        setReady(true);
+      } catch {
+        requestAnimationFrame(check);
+      }
+    };
+    check();
+  }, [map]);
+
   const recommendedIdSet = useMemo(
     () => new Set(recommendedLocationIds),
     [recommendedLocationIds],
   );
+
+  if (!ready) return null;
+
   const zoom = map.getZoom();
   const clusters =
     zoom < INDIVIDUAL_MARKER_ZOOM

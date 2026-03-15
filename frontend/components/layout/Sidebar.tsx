@@ -82,7 +82,7 @@ const NAV: NavItem[] = [
   {
     href: "/leaderboard",
     label: "Leaderboard",
-    badge: "T",
+    badge: "\u{1F3C6}",
     icon: (
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <line x1="18" y1="20" x2="18" y2="10" />
@@ -135,14 +135,16 @@ export default function Sidebar({ isMobile, isOpen, onClose }: SidebarProps) {
   return (
     <aside
       style={{
-        width: isMobile ? 280 : 236,
+        width: isMobile ? 280 : 232,
         flexShrink: 0,
         height: "100%",
         display: "flex",
         flexDirection: "column",
-        background: "var(--sidebar-bg)",
-        borderRight: "1px solid rgba(255,255,255,0.06)",
-        boxShadow: "8px 0 32px rgba(0,0,0,0.22)",
+        background: "rgba(15, 12, 5, 0.80)",
+        backdropFilter: "blur(28px) saturate(180%)",
+        WebkitBackdropFilter: "blur(28px) saturate(180%)",
+        borderRight: "1px solid rgba(245, 200, 66, 0.14)",
+        boxShadow: "6px 0 40px rgba(0,0,0,0.22), inset -1px 0 0 rgba(245,200,66,0.07)",
         position: isMobile ? "fixed" : "relative",
         top: 0,
         left: 0,
@@ -152,50 +154,59 @@ export default function Sidebar({ isMobile, isOpen, onClose }: SidebarProps) {
         transition: "transform 0.25s ease",
       }}
     >
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          background:
-            "radial-gradient(circle at top left, rgba(74,222,128,0.12) 0%, transparent 28%), radial-gradient(circle at bottom right, rgba(74,222,128,0.08) 0%, transparent 22%)",
-          pointerEvents: "none",
-        }}
-      />
+      {/* Top ambient glow */}
+      <div style={{
+        position: "absolute",
+        top: -60,
+        left: "50%",
+        transform: "translateX(-50%)",
+        width: 200,
+        height: 200,
+        background: "radial-gradient(circle, rgba(245,200,66,0.18) 0%, transparent 70%)",
+        pointerEvents: "none",
+      }} />
 
-      <div style={{ padding: "20px 20px 18px", position: "relative", zIndex: 1 }}>
+      {/* Bottom ambient glow */}
+      <div style={{
+        position: "absolute",
+        bottom: -40,
+        right: -40,
+        width: 160,
+        height: 160,
+        background: "radial-gradient(circle, rgba(245,200,66,0.07) 0%, transparent 70%)",
+        pointerEvents: "none",
+      }} />
+
+      {/* ── Logo ── */}
+      <div style={{ padding: "24px 20px 18px", position: "relative", zIndex: 1 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <div
-              style={{
-                width: 40,
-                height: 40,
-                borderRadius: 12,
-                background: "var(--gradient-btn-primary)",
-                boxShadow: "0 8px 20px rgba(34,197,94,0.22)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: 18,
-                color: "#effff3",
-                fontWeight: 800,
-                flexShrink: 0,
-              }}
-            >
-              L
+            <div style={{
+              width: 38,
+              height: 38,
+              borderRadius: 12,
+              background: "linear-gradient(135deg, #f5c842 0%, #e8a200 100%)",
+              boxShadow: "0 3px 14px rgba(245,200,66,0.45)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 19,
+              flexShrink: 0,
+            }}>
+              🍋
             </div>
             <div>
-              <div
-                style={{
-                  fontWeight: 700,
-                  fontSize: 15,
-                  color: "var(--sidebar-text)",
-                  lineHeight: 1.1,
-                  letterSpacing: "-0.02em",
-                }}
-              >
+              <div style={{
+                fontFamily: "'Fraunces', Georgia, serif",
+                fontWeight: 600,
+                fontSize: 15.5,
+                color: "#ede5cc",
+                lineHeight: 1.1,
+                letterSpacing: "-0.3px",
+              }}>
                 Lemontree
               </div>
-              <div style={{ fontSize: 11, color: "rgba(229,229,229,0.54)", marginTop: 3 }}>
+              <div style={{ fontSize: 11, color: "rgba(237,229,204,0.45)", marginTop: 2 }}>
                 Volunteer Hub
               </div>
             </div>
@@ -209,9 +220,11 @@ export default function Sidebar({ isMobile, isOpen, onClose }: SidebarProps) {
                 width: 34,
                 height: 34,
                 borderRadius: 10,
-                border: "1px solid rgba(255,255,255,0.08)",
-                background: "rgba(255,255,255,0.04)",
-                color: "var(--sidebar-text)",
+                border: "1px solid rgba(245,200,66,0.15)",
+                background: "rgba(245,200,66,0.08)",
+                color: "#ede5cc",
+                cursor: "pointer",
+                fontSize: 14,
               }}
             >
               X
@@ -220,23 +233,24 @@ export default function Sidebar({ isMobile, isOpen, onClose }: SidebarProps) {
         </div>
       </div>
 
-      <div style={{ height: 1, background: "rgba(255,255,255,0.06)", margin: "0 16px 14px" }} />
+      {/* Divider */}
+      <div style={{ height: 1, background: "rgba(245,200,66,0.12)", margin: "0 16px 16px" }} />
 
-      <div
-        style={{
-          fontSize: 10,
-          fontWeight: 700,
-          letterSpacing: "0.12em",
-          textTransform: "uppercase",
-          color: "rgba(229,229,229,0.36)",
-          padding: "0 20px 10px",
-          position: "relative",
-          zIndex: 1,
-        }}
-      >
+      {/* Section label */}
+      <div style={{
+        fontSize: 10,
+        fontWeight: 600,
+        letterSpacing: "0.12em",
+        textTransform: "uppercase",
+        color: "rgba(237,229,204,0.35)",
+        padding: "0 20px 10px",
+        position: "relative",
+        zIndex: 1,
+      }}>
         Navigation
       </div>
 
+      {/* ── Nav Items ── */}
       <nav style={{ flex: 1, padding: "0 10px", overflowY: "auto", position: "relative", zIndex: 1 }}>
         {NAV.map((item) => {
           const isActive =
@@ -253,35 +267,64 @@ export default function Sidebar({ isMobile, isOpen, onClose }: SidebarProps) {
               className={`nav-item${isActive ? " active" : ""}`}
               style={{
                 textDecoration: "none",
-                marginBottom: 4,
+                marginBottom: 2,
                 position: "relative",
               }}
             >
+              {/* Active left bar */}
+              {isActive && (
+                <span style={{
+                  position: "absolute",
+                  left: 0,
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  width: 3,
+                  height: "55%",
+                  borderRadius: "0 3px 3px 0",
+                  background: "#f5c842",
+                  boxShadow: "2px 0 10px rgba(245,200,66,0.7)",
+                }} />
+              )}
+
               <span style={{ display: "flex", flexShrink: 0 }}>{item.icon}</span>
               <span style={{ flex: 1 }}>{item.label}</span>
-              {item.badge ? <span style={{ fontSize: 12 }}>{item.badge}</span> : null}
+              {item.badge ? <span style={{ fontSize: 13 }}>{item.badge}</span> : null}
               {item.isNew && !isActive ? (
                 <span
                   style={{
-                    fontSize: 9,
+                    fontSize: 9.5,
                     fontWeight: 700,
                     letterSpacing: "0.06em",
                     padding: "2px 6px",
-                    borderRadius: 999,
-                    background: "rgba(74,222,128,0.14)",
-                    color: "var(--accent-green)",
+                    borderRadius: 5,
+                    background: "rgba(245,200,66,0.2)",
+                    color: "#f5c842",
                   }}
                 >
                   NEW
                 </span>
               ) : null}
+              {isActive && (
+                <span
+                  className="pulse-dot"
+                  style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: "50%",
+                    background: "#f5c842",
+                    flexShrink: 0,
+                  }}
+                />
+              )}
             </Link>
           );
         })}
       </nav>
 
-      <div style={{ height: 1, background: "rgba(255,255,255,0.06)", margin: "10px 16px 12px" }} />
+      {/* Divider */}
+      <div style={{ height: 1, background: "rgba(245,200,66,0.12)", margin: "10px 16px 12px" }} />
 
+      {/* ── User Footer ── */}
       <div style={{ padding: "0 10px 20px", position: "relative", zIndex: 1 }}>
         <Link
           href={user?.isGuest ? "/" : "/profile"}
@@ -294,6 +337,7 @@ export default function Sidebar({ isMobile, isOpen, onClose }: SidebarProps) {
             background: "rgba(255,255,255,0.04)",
             textDecoration: "none",
             color: "inherit",
+            transition: "background 0.18s",
           }}
         >
           <div
@@ -301,13 +345,13 @@ export default function Sidebar({ isMobile, isOpen, onClose }: SidebarProps) {
               width: 30,
               height: 30,
               borderRadius: 9,
-              background: "var(--gradient-btn-primary)",
+              background: "linear-gradient(135deg, #f5c842, #e8a200)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               fontSize: 11,
               fontWeight: 700,
-              color: "#effff3",
+              color: "#1a1000",
               flexShrink: 0,
               overflow: "hidden",
             }}
@@ -332,7 +376,7 @@ export default function Sidebar({ isMobile, isOpen, onClose }: SidebarProps) {
               style={{
                 fontSize: 12.5,
                 fontWeight: 600,
-                color: "var(--sidebar-text)",
+                color: "#ede5cc",
                 overflow: "hidden",
                 textOverflow: "ellipsis",
                 whiteSpace: "nowrap",
@@ -340,7 +384,7 @@ export default function Sidebar({ isMobile, isOpen, onClose }: SidebarProps) {
             >
               {user ? (displayName ?? user.username) : "Guest"}
             </div>
-            <div style={{ fontSize: 10.5, color: "rgba(229,229,229,0.42)", marginTop: 1 }}>
+            <div style={{ fontSize: 10.5, color: "rgba(237,229,204,0.38)", marginTop: 1 }}>
               {user?.isGuest ? "Guest" : user ? "Volunteer" : "Log in to get started"}
             </div>
           </div>
@@ -355,12 +399,13 @@ export default function Sidebar({ isMobile, isOpen, onClose }: SidebarProps) {
               marginTop: 10,
               padding: "10px 12px",
               borderRadius: 10,
-              border: "1px solid rgba(74,222,128,0.16)",
-              background: "rgba(74,222,128,0.08)",
-              color: "var(--accent-green)",
+              border: "1px solid rgba(245,200,66,0.2)",
+              background: "rgba(245,200,66,0.1)",
+              color: "#f5c842",
               fontSize: 12,
               fontWeight: 700,
               textAlign: "center",
+              cursor: "pointer",
             }}
           >
             Login or Sign up

@@ -179,7 +179,7 @@ function CommentNode({
 
 const textButtonStyle: React.CSSProperties = {
   background: "transparent",
-  color: "#166534",
+  color: "#7a5200",
   fontSize: 12,
   fontWeight: 800,
   padding: 0,

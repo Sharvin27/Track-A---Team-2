@@ -39,17 +39,21 @@ export default function CommunityFeed({
 
   return (
     <div style={{ display: "grid", gap: 12 }}>
-      {posts.map((post) => (
-        <PostCard
+      {posts.map((post, index) => (
+        <div
           key={post.id}
-          post={post}
-          token={token}
-          currentUserId={currentUserId}
-          isGuest={isGuest}
-          isMobile={isMobile}
-          onPostUpdated={onPostUpdated}
-          onPostDeleted={onPostDeleted}
-        />
+          className={`anim-fade-up d${Math.min(index + 1, 7)}`}
+        >
+          <PostCard
+            post={post}
+            token={token}
+            currentUserId={currentUserId}
+            isGuest={isGuest}
+            isMobile={isMobile}
+            onPostUpdated={onPostUpdated}
+            onPostDeleted={onPostDeleted}
+          />
+        </div>
       ))}
     </div>
   );

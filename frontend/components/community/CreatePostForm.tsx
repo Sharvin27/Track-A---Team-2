@@ -87,7 +87,7 @@ export const inputStyle: React.CSSProperties = {
 
 export const primaryButtonStyle: React.CSSProperties = {
   borderRadius: 8,
-  border: "1px solid rgba(34,197,94,0.24)",
+  border: "1px solid rgba(245,200,66,0.24)",
   background: "var(--gradient-btn-primary)",
   color: "#ffffff",
   padding: "10px 16px",

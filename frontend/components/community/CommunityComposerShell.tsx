@@ -55,7 +55,7 @@ export default function CommunityComposerShell({
             borderRadius: 28,
             border: "1px solid rgba(190,155,70,0.14)",
             background:
-              "radial-gradient(circle at top left, rgba(245,200,66,0.16) 0%, transparent 34%), radial-gradient(circle at bottom right, rgba(74,222,128,0.14) 0%, transparent 32%), rgba(255,251,243,0.96)",
+              "radial-gradient(circle at top left, rgba(245,200,66,0.16) 0%, transparent 34%), radial-gradient(circle at bottom right, rgba(245,200,66,0.10) 0%, transparent 32%), rgba(255,251,243,0.96)",
             boxShadow: "0 24px 48px rgba(31,43,18,0.08)",
             padding: "24px 24px 22px",
           }}
@@ -67,8 +67,8 @@ export default function CommunityComposerShell({
               gap: 8,
               padding: "6px 10px",
               borderRadius: 999,
-              background: "rgba(34,197,94,0.1)",
-              color: "#166534",
+              background: "rgba(245,200,66,0.15)",
+              color: "#7a5200",
               fontSize: 11,
               fontWeight: 800,
               textTransform: "uppercase",
@@ -80,7 +80,7 @@ export default function CommunityComposerShell({
           <h1
             style={{
               margin: "12px 0 0",
-              fontFamily: "'Playfair Display', serif",
+              fontFamily: "'Fraunces', Georgia, serif",
               fontSize: "clamp(2rem, 4vw, 2.25rem)",
               lineHeight: 1.02,
               letterSpacing: "-0.05em",

@@ -260,7 +260,7 @@ export default function ChatbotWidget() {
           width: 400,
           minHeight: 550,
           maxHeight: 780,
-          zIndex: 199,
+          zIndex: 10001,
           borderRadius: 20,
           border: "1px solid rgba(190,155,70,0.22)",
           boxShadow: "0 12px 48px rgba(0,0,0,0.16)",
@@ -404,11 +404,12 @@ export default function ChatbotWidget() {
         onMouseEnter={() => setFabHovered(true)}
         onMouseLeave={() => setFabHovered(false)}
         aria-label="Open help chat"
+        className={open ? undefined : "anim-fab-entrance"}
         style={{
           position: "fixed",
           bottom: 28,
           right: 28,
-          zIndex: 200,
+          zIndex: 10002,
           width: 52,
           height: 52,
           borderRadius: 16,
@@ -422,8 +423,8 @@ export default function ChatbotWidget() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          transform: fabHovered ? "scale(1.07)" : "scale(1)",
-          transition: "box-shadow 0.18s, transform 0.18s",
+          transform: fabHovered ? "scale(1.07)" : undefined,
+          transition: "transform 0.18s",
         }}
       >
         {open ? (

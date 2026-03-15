@@ -148,11 +148,11 @@ export default function MeetupCard({
           style={{
             ...primaryButtonStyle,
             opacity: token ? 1 : 0.55,
-            background: meetup.viewerJoined ? "#ffffff" : "var(--gradient-btn-primary)",
+            background: meetup.viewerJoined ? "#ffffff" : "linear-gradient(135deg, #22C55E, #16A34A)",
             color: meetup.viewerJoined ? "var(--text-muted)" : "#ffffff",
             border: meetup.viewerJoined
               ? "1px solid var(--border-subtle)"
-              : "1px solid rgba(34,197,94,0.24)",
+              : "1px solid rgba(245,200,66,0.24)",
             boxShadow: meetup.viewerJoined ? "none" : "var(--shadow-card)",
           }}
         >
