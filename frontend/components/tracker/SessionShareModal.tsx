@@ -39,6 +39,8 @@ export default function SessionShareModal({
     return null;
   }
 
+  const activeSession = session;
+
   async function handleNativeShare() {
     if (typeof navigator === "undefined" || !navigator.share) {
       setShareState("error");
@@ -50,7 +52,7 @@ export default function SessionShareModal({
     setShareError(null);
 
     try {
-      const files = await getShareFiles(session);
+      const files = await getShareFiles(activeSession);
       if (files.length && navigator.canShare?.({ files })) {
         await navigator.share({
           title: "Volunteer route summary",
@@ -94,15 +96,15 @@ export default function SessionShareModal({
   }
 
   function handleDownloadImage() {
-    if (!session.routeImageUrl || typeof document === "undefined") {
+    if (!activeSession.routeImageUrl || typeof document === "undefined") {
       setShareState("error");
       setShareError("No route image is available to download.");
       return;
     }
 
     const link = document.createElement("a");
-    const timestamp = new Date(session.endTime ?? session.startTime).toISOString().slice(0, 10);
-    link.href = session.routeImageUrl;
+    const timestamp = new Date(activeSession.endTime ?? activeSession.startTime).toISOString().slice(0, 10);
+    link.href = activeSession.routeImageUrl;
     link.download = `lemontree-route-${timestamp}.png`;
     document.body.appendChild(link);
     link.click();

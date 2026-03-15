@@ -1,6 +1,6 @@
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
-const { pool } = require("../db");
+const { query } = require("../db");
 
 const SALT_ROUNDS = 12;
 const JWT_SECRET = process.env.JWT_SECRET || "change-me-in-production";
@@ -10,6 +10,18 @@ const USER_SELECT = `
     users.id,
     users.username,
     users.email,
+    users.agreed_to_terms,
+    users.created_at,
+    profile_photos.image_url AS profile_photo_url
+  FROM users
+  LEFT JOIN profile_photos ON profile_photos.user_id = users.id
+`;
+const USER_LOGIN_SELECT = `
+  SELECT
+    users.id,
+    users.username,
+    users.email,
+    users.password_hash,
     users.agreed_to_terms,
     users.created_at,
     profile_photos.image_url AS profile_photo_url
@@ -33,7 +45,7 @@ function verifyToken(token) {
 }
 
 async function fetchUserById(userId) {
-  const result = await pool.query(`${USER_SELECT} WHERE users.id = $1`, [userId]);
+  const result = await query(`${USER_SELECT} WHERE users.id = $1`, [userId]);
   return result.rows[0] ?? null;
 }
 
@@ -52,7 +64,7 @@ async function signup(req, res) {
     }
 
     const password_hash = await bcrypt.hash(password, SALT_ROUNDS);
-    const result = await pool.query(
+    const result = await query(
       `INSERT INTO users (username, email, password_hash) VALUES ($1, $2, $3)
        RETURNING id`,
       [username.trim(), email.trim().toLowerCase(), password_hash]
@@ -80,20 +92,8 @@ async function login(req, res) {
       return res.status(400).json({ error: "Email and password are required." });
     }
 
-    const result = await pool.query(
-      `
-        SELECT
-          users.id,
-          users.username,
-          users.email,
-          users.password_hash,
-          users.agreed_to_terms,
-          users.created_at,
-          profile_photos.image_url AS profile_photo_url
-        FROM users
-        LEFT JOIN profile_photos ON profile_photos.user_id = users.id
-        WHERE users.email = $1
-      `,
+    const result = await query(
+      `${USER_LOGIN_SELECT} WHERE users.email = $1`,
       [email.trim().toLowerCase()]
     );
     const row = result.rows[0];
@@ -146,7 +146,7 @@ async function agreeToTerms(req, res) {
       return res.status(401).json({ error: "Not authenticated." });
     }
     const decoded = verifyToken(token);
-    await pool.query(
+    await query(
       "UPDATE users SET agreed_to_terms = TRUE WHERE id = $1 RETURNING id",
       [decoded.userId]
     );
@@ -174,7 +174,7 @@ async function uploadProfilePhoto(req, res) {
     }
 
     const decoded = verifyToken(token);
-    await pool.query(
+    await query(
       `
         INSERT INTO profile_photos (user_id, image_url)
         VALUES ($1, $2)
