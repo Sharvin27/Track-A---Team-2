@@ -29,7 +29,11 @@ import type {
 } from "@/types/tracker";
 
 const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ?? "http://localhost:5001";
+  (
+    process.env.NEXT_PUBLIC_API_BASE_URL ||
+    process.env.NEXT_PUBLIC_API_URL ||
+    "http://localhost:5001"
+  ).replace(/\/$/, "");
 
 export default function TrackerPage() {
   const watchIdRef = useRef<number | null>(null);

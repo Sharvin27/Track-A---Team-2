@@ -1,11 +1,11 @@
-const db = require("../db/database");
+const { getPool, query } = require("../db");
 
 const FOOD_NEED_DATASET_URL =
   "https://data.cityofnewyork.us/resource/4kc9-zrs2.json?%24limit=1000&%24order=year%20DESC%2C%20weighted_score%20DESC";
 const NTA_BOUNDARY_DATASET_URL =
   "https://data.cityofnewyork.us/resource/9nt8-h7nd.json?%24limit=1000";
 
-const upsertRegionStatement = db.prepare(`
+const UPSERT_REGION_SQL = `
   INSERT INTO need_regions (
     region_code,
     region_name,
@@ -20,55 +20,30 @@ const upsertRegionStatement = db.prepare(`
     source_year,
     updated_at
   ) VALUES (
-    @regionCode,
-    @regionName,
-    @boroughName,
-    @regionType,
-    @geometryJson,
-    @centroidLat,
-    @centroidLng,
-    @foodInsecurePercentage,
-    @foodNeedScore,
-    @weightedRank,
-    @sourceYear,
-    @updatedAt
+    $1, $2, $3, $4, $5::jsonb, $6, $7, $8, $9, $10, $11, $12::timestamptz
   )
   ON CONFLICT(region_code) DO UPDATE SET
-    region_name = excluded.region_name,
-    borough_name = excluded.borough_name,
-    region_type = excluded.region_type,
-    geometry_json = excluded.geometry_json,
-    centroid_lat = excluded.centroid_lat,
-    centroid_lng = excluded.centroid_lng,
-    food_insecure_percentage = excluded.food_insecure_percentage,
-    food_need_score = excluded.food_need_score,
-    weighted_rank = excluded.weighted_rank,
-    source_year = excluded.source_year,
-    updated_at = excluded.updated_at
-`);
+    region_name = EXCLUDED.region_name,
+    borough_name = EXCLUDED.borough_name,
+    region_type = EXCLUDED.region_type,
+    geometry_json = EXCLUDED.geometry_json,
+    centroid_lat = EXCLUDED.centroid_lat,
+    centroid_lng = EXCLUDED.centroid_lng,
+    food_insecure_percentage = EXCLUDED.food_insecure_percentage,
+    food_need_score = EXCLUDED.food_need_score,
+    weighted_rank = EXCLUDED.weighted_rank,
+    source_year = EXCLUDED.source_year,
+    updated_at = EXCLUDED.updated_at
+`;
 
-const selectAllRegionsStatement = db.prepare(`
-  SELECT *
-  FROM need_regions
-  ORDER BY food_insecure_percentage DESC, food_need_score DESC, region_name ASC
-`);
+async function getStoredNeedRegions() {
+  const result = await query(`
+    SELECT *
+    FROM need_regions
+    ORDER BY food_insecure_percentage DESC NULLS LAST, food_need_score DESC, region_name ASC
+  `);
 
-const selectAllHotspotsStatement = db.prepare(`
-  SELECT id, lat, lng
-  FROM hotspot_locations
-`);
-
-const updateHotspotRegionStatement = db.prepare(`
-  UPDATE hotspot_locations
-  SET
-    region_code = @regionCode,
-    region_name = @regionName,
-    region_need_score = @regionNeedScore
-  WHERE id = @id
-`);
-
-function getStoredNeedRegions() {
-  return selectAllRegionsStatement.all().map(normalizeRegionRow);
+  return result.rows.map(normalizeRegionRow);
 }
 
 async function importNeedRegionsFromNycOpenData() {
@@ -122,14 +97,37 @@ async function importNeedRegionsFromNycOpenData() {
     })
     .filter(Boolean);
 
-  const transaction = db.transaction((regions) => {
-    for (const region of regions) {
-      upsertRegionStatement.run(region);
-    }
-  });
+  const client = await getPool().connect();
 
-  transaction(joinedRegions);
-  const annotationSummary = annotateStoredHotspotsWithNeedRegions();
+  try {
+    await client.query("BEGIN");
+
+    for (const region of joinedRegions) {
+      await client.query(UPSERT_REGION_SQL, [
+        region.regionCode,
+        region.regionName,
+        region.boroughName,
+        region.regionType,
+        region.geometryJson,
+        region.centroidLat,
+        region.centroidLng,
+        region.foodInsecurePercentage,
+        region.foodNeedScore,
+        region.weightedRank,
+        region.sourceYear,
+        region.updatedAt,
+      ]);
+    }
+
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+
+  const annotationSummary = await annotateStoredHotspotsWithNeedRegions();
 
   return {
     importedCount: joinedRegions.length,
@@ -139,34 +137,58 @@ async function importNeedRegionsFromNycOpenData() {
   };
 }
 
-function annotateStoredHotspotsWithNeedRegions() {
-  const regions = getStoredNeedRegions();
-  const hotspots = selectAllHotspotsStatement.all();
+async function annotateStoredHotspotsWithNeedRegions() {
+  const regions = await getStoredNeedRegions();
+  const hotspotResult = await query(`
+    SELECT id, lat, lng
+    FROM hotspot_locations
+  `);
   let annotatedCount = 0;
+  const client = await getPool().connect();
 
-  const transaction = db.transaction((rows) => {
-    for (const row of rows) {
-      const assignment = findNeedRegionForPoint(row.lat, row.lng, regions);
+  try {
+    await client.query("BEGIN");
 
-      updateHotspotRegionStatement.run({
-        id: row.id,
-        regionCode: assignment?.regionCode || null,
-        regionName: assignment?.regionName || null,
-        regionNeedScore: assignment?.foodNeedScore ?? null,
-      });
+    for (const row of hotspotResult.rows) {
+      const assignment = findNeedRegionForPointInRegions(row.lat, row.lng, regions);
+
+      await client.query(
+        `
+          UPDATE hotspot_locations
+          SET
+            region_code = $1,
+            region_name = $2,
+            region_need_score = $3
+          WHERE id = $4
+        `,
+        [
+          assignment?.regionCode || null,
+          assignment?.regionName || null,
+          assignment?.foodNeedScore ?? null,
+          row.id,
+        ],
+      );
 
       if (assignment) annotatedCount += 1;
     }
-  });
 
-  transaction(hotspots);
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
 
   return { annotatedCount };
 }
 
-function findNeedRegionForPoint(lat, lng, cachedRegions) {
-  const regions = cachedRegions || getStoredNeedRegions();
+async function findNeedRegionForPoint(lat, lng, cachedRegions) {
+  const regions = cachedRegions || (await getStoredNeedRegions());
+  return findNeedRegionForPointInRegions(lat, lng, regions);
+}
 
+function findNeedRegionForPointInRegions(lat, lng, regions) {
   for (const region of regions) {
     if (pointInGeometry({ lat, lng }, region.geometry)) {
       return region;
@@ -200,21 +222,22 @@ async function fetchJson(url) {
 }
 
 function normalizeRegionRow(row) {
-  const geometry =
-    typeof row.geometry_json === "string" ? JSON.parse(row.geometry_json) : row.geometry_json;
-
   return {
     id: String(row.id),
     regionCode: row.region_code,
     regionName: row.region_name,
     boroughName: row.borough_name || "",
     regionType: row.region_type || "",
-    geometry,
-    centroidLat: row.centroid_lat,
-    centroidLng: row.centroid_lng,
-    foodInsecurePercentage: row.food_insecure_percentage,
-    foodNeedScore: row.food_need_score,
-    weightedRank: row.weighted_rank,
+    geometry:
+      typeof row.geometry_json === "string"
+        ? JSON.parse(row.geometry_json)
+        : row.geometry_json,
+    centroidLat: Number(row.centroid_lat),
+    centroidLng: Number(row.centroid_lng),
+    foodInsecurePercentage:
+      row.food_insecure_percentage === null ? null : Number(row.food_insecure_percentage),
+    foodNeedScore: Number(row.food_need_score),
+    weightedRank: row.weighted_rank === null ? null : Number(row.weighted_rank),
     sourceYear: row.source_year,
   };
 }
@@ -263,7 +286,11 @@ function pointInPolygonRings(point, polygonRings) {
 function pointInRing(point, ring) {
   let inside = false;
 
-  for (let currentIndex = 0, previousIndex = ring.length - 1; currentIndex < ring.length; previousIndex = currentIndex++) {
+  for (
+    let currentIndex = 0, previousIndex = ring.length - 1;
+    currentIndex < ring.length;
+    previousIndex = currentIndex++
+  ) {
     const [x1, y1] = ring[currentIndex];
     const [x2, y2] = ring[previousIndex];
     const intersects =
@@ -292,6 +319,7 @@ function flattenGeometryPoints(geometry) {
 module.exports = {
   annotateStoredHotspotsWithNeedRegions,
   findNeedRegionForPoint,
+  findNeedRegionForPointInRegions,
   getStoredNeedRegions,
   importNeedRegionsFromNycOpenData,
 };
