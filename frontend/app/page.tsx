@@ -1,0 +1,237 @@
+import Link from "next/link";
+import { HoverLink } from "@/components/common/HoverLink";
+
+/* ─── Data ───────────────────────────────── */
+const STATS = [
+  { label: "Flyers Distributed", value: "1,284", change: "+48 this week",       icon: "📄", iconBg: "#fef3c7" },
+  { label: "Active Volunteers",   value: "37",    change: "3 joined today",      icon: "🙌", iconBg: "#dcfce7" },
+  { label: "Zones Covered",       value: "12",    change: "2 new this month",    icon: "📍", iconBg: "#ede9fe" },
+  { label: "Resources Shared",    value: "94",    change: "↑ 18% vs last month", icon: "🍎", iconBg: "#fee2e2" },
+];
+
+const QUICK = [
+  { href: "/map",         emoji: "🗺️", label: "Flyering Zones", desc: "Find where to distribute flyers today", bg: "#fef9c3", border: "#fde68a" },
+  { href: "/printers",    emoji: "🖨️", label: "Find a Printer",  desc: "Locate nearby print shops",            bg: "#ede9fe", border: "#ddd6fe" },
+  { href: "/leaderboard", emoji: "🏆", label: "Leaderboard",     desc: "See this month's top volunteers",      bg: "#dcfce7", border: "#bbf7d0" },
+  { href: "/onboarding",  emoji: "🚀", label: "New Volunteer?",  desc: "Get started in 4 easy steps",          bg: "#fce7f3", border: "#fbcfe8" },
+];
+
+const ACTIVITY = [
+  { name: "Maria G.",  avatar: "MG", action: "Distributed 40 flyers",     zone: "South Bronx",     time: "2h ago",    color: "#f5c842" },
+  { name: "James T.",  avatar: "JT", action: "Completed onboarding",       zone: "",                time: "3h ago",    color: "#22c55e" },
+  { name: "Priya K.",  avatar: "PK", action: "Added 2 resource locations", zone: "East Harlem",     time: "5h ago",    color: "#8b5cf6" },
+  { name: "Carlos M.", avatar: "CM", action: "Printed 100 flyers",         zone: "Staples Midtown", time: "Yesterday", color: "#f97316" },
+];
+
+const card: React.CSSProperties = {
+  background: "#ffffff",
+  border: "1px solid rgba(190,155,70,0.18)",
+  borderRadius: 16,
+  boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+};
+
+export default function HomePage() {
+  return (
+    <div style={{ padding: "32px 36px", width: "100%" }}>
+
+      {/* ══ Hero Banner ══════════════════════════════════════════════ */}
+      <div
+        className="anim-fade-up d1"
+        style={{
+          position: "relative",
+          borderRadius: 20,
+          overflow: "hidden",
+          background: "linear-gradient(130deg, #f5c842 0%, #fbbf24 55%, #f59e0b 100%)",
+          boxShadow: "0 8px 32px rgba(245,200,66,0.38)",
+          marginBottom: 24,
+          minHeight: 175,
+        }}
+      >
+        {/* Decorative circles */}
+        <div style={{ position: "absolute", top: -50, right: 120, width: 200, height: 200, borderRadius: "50%", background: "rgba(255,255,255,0.12)", pointerEvents: "none" }} />
+        <div style={{ position: "absolute", bottom: -60, right: -20, width: 180, height: 180, borderRadius: "50%", background: "rgba(255,255,255,0.08)", pointerEvents: "none" }} />
+
+        {/* Floating lemon */}
+        <div
+          className="anim-float"
+          style={{
+            position: "absolute", right: 48, top: "50%", transform: "translateY(-50%)",
+            fontSize: 72, lineHeight: 1,
+            filter: "drop-shadow(0 8px 18px rgba(0,0,0,0.14))",
+            pointerEvents: "none", userSelect: "none",
+          }}
+        >
+          🍋
+        </div>
+
+        <div style={{ position: "relative", zIndex: 1, padding: "36px 44px" }}>
+          <p style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase", color: "rgba(90,60,0,0.65)", marginBottom: 8 }}>
+            Community Food Access
+          </p>
+          <h2 style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 32, fontWeight: 700, color: "#1a1000", lineHeight: 1.15, letterSpacing: "-0.6px", marginBottom: 8 }}>
+            Spread the Word.<br />
+            <span style={{ fontStyle: "italic", fontWeight: 400 }}>Feed the Community.</span>
+          </h2>
+          <p style={{ fontSize: 13.5, color: "rgba(60,40,0,0.62)", marginBottom: 22, maxWidth: 380 }}>
+            There&rsquo;s more than enough food to go around &mdash; we just have to help our neighbors find it.
+          </p>
+          {/* Static link — no hover handlers needed on hero CTA */}
+          <Link
+            href="/onboarding"
+            style={{
+              display: "inline-flex", alignItems: "center", gap: 8,
+              padding: "10px 22px", borderRadius: 11,
+              background: "rgba(18,12,0,0.84)", color: "#f5c842",
+              fontSize: 13, fontWeight: 600, letterSpacing: "-0.1px",
+              textDecoration: "none", boxShadow: "0 3px 12px rgba(0,0,0,0.22)",
+            }}
+          >
+            Start Volunteering
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" />
+            </svg>
+          </Link>
+        </div>
+      </div>
+
+      {/* ══ Stats Row ════════════════════════════════════════════════ */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 24 }}>
+        {STATS.map((s, i) => (
+          <div
+            key={s.label}
+            className={`anim-fade-up d${i + 2}`}
+            style={{ ...card, padding: "20px 22px" }}
+          >
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 16 }}>
+              <span style={{ fontSize: 12, color: "#8a7a50", fontWeight: 500 }}>{s.label}</span>
+              <div style={{ width: 32, height: 32, borderRadius: 10, background: s.iconBg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, flexShrink: 0 }}>
+                {s.icon}
+              </div>
+            </div>
+            <div
+              className={`anim-num-pop d${i + 3}`}
+              style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 30, fontWeight: 700, color: "#1a1600", letterSpacing: "-1px", lineHeight: 1, marginBottom: 5 }}
+            >
+              {s.value}
+            </div>
+            <p style={{ fontSize: 11.5, color: "#9a8a60" }}>{s.change}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* ══ Quick Actions + Activity ═════════════════════════════════ */}
+      <div
+        className="anim-fade-up d5"
+        style={{ display: "grid", gridTemplateColumns: "3fr 2fr", gap: 20, marginBottom: 20 }}
+      >
+        {/* Quick Actions */}
+        <div style={{ ...card, padding: "24px" }}>
+          <h3 style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 17, fontWeight: 700, color: "#1a1600", letterSpacing: "-0.3px" }}>
+            Quick Actions
+          </h3>
+          <p style={{ fontSize: 12, color: "#9a8a60", marginTop: 3, marginBottom: 18 }}>Jump to what you need</p>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            {QUICK.map((q) => (
+              <HoverLink
+                key={q.href}
+                href={q.href}
+                baseStyle={{
+                  display: "flex", alignItems: "center", gap: 12,
+                  padding: "14px 16px", borderRadius: 12,
+                  background: q.bg, border: `1px solid ${q.border}`,
+                  transition: "transform 0.18s, box-shadow 0.18s",
+                }}
+                hoverStyle={{
+                  transform: "translateY(-2px)",
+                  boxShadow: "0 6px 20px rgba(0,0,0,0.09)",
+                }}
+              >
+                <span style={{ fontSize: 24, lineHeight: 1, flexShrink: 0 }}>{q.emoji}</span>
+                <div>
+                  <p style={{ fontSize: 13, fontWeight: 600, color: "#1a1600", marginBottom: 2 }}>{q.label}</p>
+                  <p style={{ fontSize: 11.5, color: "#7a6a40", lineHeight: 1.3 }}>{q.desc}</p>
+                </div>
+              </HoverLink>
+            ))}
+          </div>
+        </div>
+
+        {/* Recent Activity */}
+        <div style={{ ...card, padding: "24px" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
+            <div>
+              <h3 style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 17, fontWeight: 700, color: "#1a1600", letterSpacing: "-0.3px" }}>
+                Recent Activity
+              </h3>
+              <p style={{ fontSize: 12, color: "#9a8a60", marginTop: 3 }}>Community updates</p>
+            </div>
+            <span style={{ fontSize: 12, color: "#9a8a60", cursor: "pointer" }}>View all →</span>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            {ACTIVITY.map((a, i) => (
+              <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+                <div style={{
+                  width: 34, height: 34, borderRadius: 10,
+                  background: a.color + "28",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: 11, fontWeight: 700, color: a.color,
+                  flexShrink: 0, letterSpacing: "-0.3px",
+                }}>
+                  {a.avatar}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ fontSize: 12.5, fontWeight: 600, color: "#1a1600", lineHeight: 1.1 }}>{a.name}</p>
+                  <p style={{ fontSize: 12, color: "#5a4a20", marginTop: 2, lineHeight: 1.35 }}>
+                    {a.action}
+                    {a.zone && <span style={{ color: "#9a8a60" }}> · {a.zone}</span>}
+                  </p>
+                  <p style={{ fontSize: 11, color: "#b0a070", marginTop: 2 }}>{a.time}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ══ CTA Banner ═══════════════════════════════════════════════ */}
+      <div
+        className="anim-fade-up d6"
+        style={{
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          padding: "22px 32px", borderRadius: 18,
+          background: "linear-gradient(120deg, #1a1200 55%, #2c1e00 100%)",
+          border: "1px solid rgba(245,200,66,0.14)",
+          boxShadow: "0 4px 24px rgba(0,0,0,0.14)",
+        }}
+      >
+        <div>
+          <h4 style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 16, fontWeight: 700, color: "#f5c842", letterSpacing: "-0.3px", marginBottom: 4 }}>
+            Ready to make a real difference?
+          </h4>
+          <p style={{ fontSize: 12.5, color: "rgba(237,218,170,0.52)" }}>
+            Join 37 active volunteers and help connect your neighbors to free food resources.
+          </p>
+        </div>
+        <HoverLink
+          href="/map"
+          baseStyle={{
+            flexShrink: 0, display: "flex", alignItems: "center", gap: 8,
+            padding: "11px 24px", borderRadius: 12,
+            background: "#f5c842", color: "#1a1000",
+            fontSize: 13, fontWeight: 700,
+            boxShadow: "0 4px 16px rgba(245,200,66,0.32)",
+            letterSpacing: "-0.1px",
+            transition: "transform 0.15s, box-shadow 0.15s",
+          }}
+          hoverStyle={{
+            transform: "translateY(-1px)",
+            boxShadow: "0 6px 24px rgba(245,200,66,0.45)",
+          }}
+        >
+          🗺️ Find My Zone
+        </HoverLink>
+      </div>
+
+    </div>
+  );
+}
