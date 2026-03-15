@@ -8,7 +8,7 @@ export default function PageContainer({
   return (
     <div
       style={{
-        padding: "clamp(16px, 3vw, 32px) clamp(16px, 3vw, 36px)",
+        padding: "32px 36px",
         width: "100%",
         ...style,
       }}
