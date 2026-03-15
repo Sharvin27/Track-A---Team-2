@@ -1,0 +1,58 @@
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001";
+
+export type User = {
+  id: number;
+  username: string;
+  email: string;
+  agreed_to_terms: boolean;
+  created_at: string;
+  isGuest?: boolean;
+};
+
+export async function signup(
+  username: string,
+  email: string,
+  password: string
+): Promise<{ user: User; token: string }> {
+  const res = await fetch(`${API_BASE}/api/auth/signup`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, email, password }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Signup failed");
+  return data;
+}
+
+export async function login(
+  email: string,
+  password: string
+): Promise<{ user: User; token: string }> {
+  const res = await fetch(`${API_BASE}/api/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Login failed");
+  return data;
+}
+
+export async function me(token: string): Promise<{ user: User }> {
+  const res = await fetch(`${API_BASE}/api/auth/me`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Not authenticated");
+  return data;
+}
+
+export async function agreeToTerms(token: string): Promise<{ user: User }> {
+  const res = await fetch(`${API_BASE}/api/auth/agree-terms`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Failed to update");
+  return data;
+}

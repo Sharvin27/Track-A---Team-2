@@ -1,6 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
 
 const META: Record<string, { title: string; sub: string }> = {
   "/":            { title: "Welcome back 👋",   sub: "Here's what's happening in your community today." },
@@ -8,12 +10,24 @@ const META: Record<string, { title: string; sub: string }> = {
   "/profile":     { title: "Your Profile ✨",    sub: "Track your volunteer contributions and impact." },
   "/leaderboard": { title: "Leaderboard 🏆",     sub: "Top volunteers making a difference this month." },
   "/printers":    { title: "Nearby Printers 🖨️", sub: "Find a printer close to you for your flyers." },
-  "/onboarding":  { title: "Get Started 🚀",     sub: "Everything you need to begin volunteering." },
+  "/getstarted":  { title: "Get Started 🚀",     sub: "Everything you need to begin volunteering." },
+  "/onboarding":  { title: "Log in",            sub: "Sign in or create an account to continue." },
 };
+
+function getInitial(name: string): string {
+  if (!name?.trim()) return "?";
+  return name.trim()[0].toUpperCase();
+}
 
 export default function Header() {
   const pathname = usePathname();
-  const meta = META[pathname] ?? META["/"];
+  const baseMeta = META[pathname] ?? META["/"];
+  const { user } = useAuth();
+  const title =
+    pathname === "/" && user
+      ? `Welcome back, ${user.username} 👋`
+      : baseMeta.title;
+  const meta = { ...baseMeta, title };
 
   return (
     <header
@@ -110,7 +124,8 @@ export default function Header() {
         </button>
 
         {/* Avatar */}
-        <div
+        <Link
+          href="/profile"
           style={{
             width: 36,
             height: 36,
@@ -124,10 +139,11 @@ export default function Header() {
             color: "#1a1000",
             cursor: "pointer",
             boxShadow: "0 2px 10px rgba(245,200,66,0.35)",
+            textDecoration: "none",
           }}
         >
-          SG
-        </div>
+          {user ? getInitial(user.username) : "?"}
+        </Link>
       </div>
     </header>
   );

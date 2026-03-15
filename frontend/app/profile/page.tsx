@@ -1,6 +1,10 @@
+"use client";
+
 import PageContainer from "@/components/layout/PageContainer";
 import SectionCard from "@/components/common/SectionCard";
 import StatCard from "@/components/common/StatCard";
+import GuestGate from "@/components/auth/GuestGate";
+import { useAuth } from "@/context/AuthContext";
 
 const stats = [
   { label: "Flyers Handed Out",  value: "340", icon: "📄", iconBg: "#fef3c7" },
@@ -26,13 +30,41 @@ const badges = [
   { emoji: "🌟", label: "Community Star",earned: false },
 ];
 
-const profileMeta = [
-  { icon: "📍", label: "Brooklyn, NY" },
-  { icon: "📅", label: "Joined January 2025" },
-  { icon: "🌐", label: "English, Spanish" },
-];
+function getInitial(name: string): string {
+  if (!name?.trim()) return "?";
+  return name.trim()[0].toUpperCase();
+}
+
+function formatJoined(createdAt: string | undefined): string {
+  if (!createdAt) return "Volunteer";
+  try {
+    const d = new Date(createdAt);
+    return `Joined ${d.toLocaleDateString("en-US", { month: "long", year: "numeric" })}`;
+  } catch {
+    return "Volunteer";
+  }
+}
 
 export default function ProfilePage() {
+  const { user, logout } = useAuth();
+
+  if (user?.isGuest) {
+    return (
+      <GuestGate
+        message="Login or sign up to access your profile, stats, and badges."
+        onGoToLogin={logout}
+      />
+    );
+  }
+
+  const displayName = user?.username ?? "Volunteer";
+  const initial = getInitial(displayName);
+
+  const profileMeta = [
+    { icon: "📧", label: user?.email ?? "—" },
+    { icon: "📅", label: formatJoined(user?.created_at) },
+  ];
+
   return (
     <PageContainer>
       <div style={{ display: "grid", gridTemplateColumns: "260px 1fr", gap: 20 }}>
@@ -51,10 +83,10 @@ export default function ProfilePage() {
                 fontSize: 24, fontWeight: 700, color: "#1a1000",
                 boxShadow: "0 4px 16px rgba(245,200,66,0.35)",
               }}>
-                SG
+                {initial}
               </div>
               <h2 style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 20, fontWeight: 700, color: "#1a1600", letterSpacing: "-0.4px" }}>
-                Sharvin Gavad
+                {displayName}
               </h2>
               <p style={{ fontSize: 13, color: "#9a8a60", marginTop: 3 }}>Community Volunteer</p>
               <div style={{ marginTop: 10, padding: "4px 12px", borderRadius: 99, background: "#dcfce7", fontSize: 11.5, fontWeight: 600, color: "#15803d" }}>
@@ -70,6 +102,25 @@ export default function ProfilePage() {
                   </div>
                 ))}
               </div>
+
+              <button
+                type="button"
+                onClick={logout}
+                style={{
+                  marginTop: 16,
+                  padding: "8px 16px",
+                  borderRadius: 10,
+                  border: "1px solid rgba(190,155,70,0.3)",
+                  background: "transparent",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: "#9a8a60",
+                  cursor: "pointer",
+                  width: "100%",
+                }}
+              >
+                Log out
+              </button>
             </div>
           </SectionCard>
 
