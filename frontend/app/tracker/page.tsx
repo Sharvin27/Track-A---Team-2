@@ -39,7 +39,7 @@ const API_BASE_URL =
   ).replace(/\/$/, "");
 
 export default function TrackerPage() {
-  const { token } = useAuth();
+  const { token, isGuest } = useAuth();
   const watchIdRef = useRef<number | null>(null);
   const captureSnapshotRef = useRef<(() => Promise<string | null>) | null>(null);
   const [isMobile, setIsMobile] = useState(false);
@@ -197,13 +197,13 @@ export default function TrackerPage() {
     setStatusMessage("Session stopped. Summary ready.");
 
     try {
-      setSaveState("saving");
       setSaveError(null);
-
-      if (!token) {
-        throw new Error("Login is required to save a completed session.");
+      if (isGuest || !token) {
+        setSaveState("idle");
+        return;
       }
 
+      setSaveState("saving");
       const response = await fetch(`${API_BASE_URL}/api/sessions`, {
         method: "POST",
         headers: {
@@ -442,6 +442,7 @@ export default function TrackerPage() {
           isOpen={isShareOpen}
           session={lastCompletedSession}
           onClose={() => setIsShareOpen(false)}
+          isGuest={isGuest}
         />
 
         <SectionCard title="Tracking Notes" subtitle="MVP guardrails and behavior">

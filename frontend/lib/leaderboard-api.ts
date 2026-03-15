@@ -14,10 +14,20 @@ export type LeaderboardEntry = {
   total_duration_seconds: number;
   total_distance_meters: number;
   total_stops: number;
+  flyers: number;
+  hours: number;
   rank: number;
+  hours_rank?: number;
 };
 
-export async function getLeaderboard(): Promise<{ success: boolean; count: number; data: LeaderboardEntry[] }> {
+export type LeaderboardResponse = {
+  success: boolean;
+  count: number;
+  data: LeaderboardEntry[];
+  podium: LeaderboardEntry[];
+};
+
+export async function getLeaderboard(): Promise<LeaderboardResponse> {
   const response = await fetch(`${API_BASE}/api/leaderboard`);
   const payload = await response.json();
   if (!response.ok) {
