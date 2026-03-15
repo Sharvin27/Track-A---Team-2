@@ -1,6 +1,15 @@
 "use client";
 
+import PlacementProofModal from "@/components/map/PlacementProofModal";
+import PlacementTargetCard from "@/components/map/PlacementTargetCard";
+import TargetDetailsDrawer from "@/components/map/TargetDetailsDrawer";
+import type {
+  PlacementSubmissionResult,
+  PlacementTarget,
+  PlacementTargetStatus,
+} from "@/types/placement";
 import dynamic from "next/dynamic";
+import type { CSSProperties, ReactNode } from "react";
 import { useEffect, useEffectEvent, useState } from "react";
 
 const API_BASE_URL =
@@ -28,6 +37,13 @@ export type MapLocation = {
   priority: "High" | "Medium" | "Low";
   score: number;
   covered: boolean;
+  placementTargetId: string;
+  placementStatus: PlacementTargetStatus;
+  latestSubmissionAt: string | null;
+  latestVerificationScore: number | null;
+  latestSubmissionId: string | null;
+  latestReviewReason: string | null;
+  verifiedCount: number;
   lastChecked: string;
   assignedTo: string;
   notes: string;
@@ -115,12 +131,6 @@ type ImportResponse = {
   message?: string;
 };
 
-type UpdateLocationResponse = {
-  success: boolean;
-  data?: MapLocation;
-  message?: string;
-};
-
 type NeedRegionsResponse = {
   success: boolean;
   count: number;
@@ -151,18 +161,17 @@ const hubs: MapHub[] = [
   { id: "hub-staten", name: "Staten Island Base", lat: 40.5795, lng: -74.1502 },
 ];
 
-const priorityStyle = {
-  High: { bg: "rgba(239,68,68,0.14)", color: "#b91c1c" },
-  Medium: { bg: "rgba(245,158,11,0.16)", color: "#b45309" },
-  Low: { bg: "rgba(34,197,94,0.14)", color: "#15803d" },
-};
-
 const HOTSPOT_REVEAL_ZOOM = 15;
 
 export default function OutreachMapDashboard() {
   const [locations, setLocations] = useState<MapLocation[]>([]);
   const [needRegions, setNeedRegions] = useState<MapNeedRegion[]>([]);
   const [selectedLocationId, setSelectedLocationId] = useState<string | null>(null);
+  const [isProofModalOpen, setIsProofModalOpen] = useState(false);
+  const [activeVerificationTarget, setActiveVerificationTarget] =
+    useState<PlacementTarget | null>(null);
+  const [submissionResult, setSubmissionResult] =
+    useState<PlacementSubmissionResult | null>(null);
   const [activeHubId, setActiveHubId] = useState(hubs[0].id);
   const [radiusMiles, setRadiusMiles] = useState(5);
   const [layers, setLayers] = useState<LayerVisibility>({
@@ -236,6 +245,10 @@ export default function OutreachMapDashboard() {
   const suggestedLocations = [...rankedLocations]
     .filter((location) => location.distanceMiles <= radiusMiles)
     .slice(0, 4);
+  const suggestedCardLocations = recommendedLocations.slice(0, 3);
+  const selectedPlacementTarget = selectedLocation
+    ? mapLocationToPlacementTarget(selectedLocation)
+    : null;
 
   const runInitialLoad = useEffectEvent(() => {
     void loadStoredHotspots(true);
@@ -288,11 +301,14 @@ export default function OutreachMapDashboard() {
         setHasAutoSeeded(true);
         void syncNycHotspots(true);
       }
+
+      return nextLocations;
     } catch (error) {
       setErrorMessage(
         error instanceof Error ? error.message : "Failed to load OSM hotspots",
       );
       setLocations([]);
+      return [];
     } finally {
       setIsLoading(false);
     }
@@ -477,36 +493,85 @@ export default function OutreachMapDashboard() {
     }
   }
 
-  async function toggleCovered(id: string, covered: boolean) {
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/locations/${id}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          covered: !covered,
-          lastChecked: "Just now",
-          assignedTo: !covered ? "Volunteer confirmed" : "Open shift",
-        }),
-      });
+  function mapLocationToPlacementTarget(location: MapLocation): PlacementTarget {
+    return {
+      id: location.placementTargetId || `hotspot:${location.id}`,
+      hotspotId: location.id,
+      name: location.name,
+      zoneName:
+        location.regionName || location.neighborhood || "Selected Zone",
+      type: location.category || "other",
+      address: location.address || "Address unavailable",
+      lat: location.lat,
+      lng: location.lng,
+      allowedFlyering: true,
+      busyLevel:
+        location.priority === "High"
+          ? "high"
+          : location.priority === "Medium"
+            ? "medium"
+            : "low",
+      status: getLocationPlacementStatus(location),
+      latestSubmissionAt: location.latestSubmissionAt || null,
+      latestVerificationScore: location.latestVerificationScore || null,
+      latestSubmissionId: location.latestSubmissionId || null,
+      latestReviewReason: location.latestReviewReason || null,
+      verifiedCount: location.verifiedCount || 0,
+      expectedFlyerKeywords: [
+        "lemontree",
+        "foodhelpline.org",
+        location.name,
+        location.regionName,
+        location.neighborhood,
+      ].filter((value): value is string => Boolean(value)),
+      campaignRef: location.sourceKey || null,
+    };
+  }
 
-      const payload = (await response.json()) as UpdateLocationResponse;
+  function handleOpenVerificationForLocation(location: MapLocation) {
+    setSelectedLocationId(location.id);
+    setActiveVerificationTarget(mapLocationToPlacementTarget(location));
+    setSubmissionResult(null);
+    setIsProofModalOpen(true);
+  }
 
-      if (!response.ok || !payload.success || !payload.data) {
-        throw new Error(payload.message || "Failed to update hotspot");
-      }
-
-      setLocations((current) =>
-        current.map((location) =>
-          location.id === payload.data?.id ? payload.data : location,
-        ),
-      );
-    } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "Failed to update hotspot",
-      );
+  function handleOpenVerificationForSelectedLocation() {
+    if (!selectedLocation) {
+      return;
     }
+
+    handleOpenVerificationForLocation(selectedLocation);
+  }
+
+  async function refreshLocationsAndReselect(locationId: string | null) {
+    const nextLocations = await loadStoredHotspots(false);
+
+    if (!locationId) {
+      setSelectedLocationId(null);
+      return;
+    }
+
+    const nextLocation =
+      nextLocations.find((location) => location.id === locationId) || null;
+    setSelectedLocationId(nextLocation ? nextLocation.id : null);
+
+    if (nextLocation) {
+      setActiveVerificationTarget(mapLocationToPlacementTarget(nextLocation));
+    }
+  }
+
+  function handleVerificationSubmitted(result: PlacementSubmissionResult) {
+    setSubmissionResult(result);
+    setSyncMessage(
+      result.status === "verified"
+        ? "Placement proof verified and hotspot coverage has been refreshed."
+        : result.status === "pending_review"
+          ? "Placement proof submitted for review. Hotspot status has been refreshed."
+          : "Placement proof was rejected. Retake guidance is now reflected on the hotspot.",
+    );
+    void refreshLocationsAndReselect(
+      result.hotspotId || selectedLocationId || activeVerificationTarget?.hotspotId || null,
+    );
   }
 
   function openGoogleMapsLocation(location: RankedLocation) {
@@ -797,7 +862,23 @@ export default function OutreachMapDashboard() {
                   }
                 />
                 <LegendItem
-                  label="Uncovered spot"
+                  label="Needs coverage"
+                  icon={
+                    <span
+                      style={{
+                        width: 14,
+                        height: 14,
+                        borderRadius: 999,
+                        background: "#64748b",
+                        border: "3px solid #ffffff",
+                        boxShadow: "0 6px 14px rgba(100,116,139,0.18)",
+                        display: "inline-block",
+                      }}
+                    />
+                  }
+                />
+                <LegendItem
+                  label="Pending review"
                   icon={
                     <span
                       style={{
@@ -823,6 +904,22 @@ export default function OutreachMapDashboard() {
                         background: "#16a34a",
                         border: "3px solid #ffffff",
                         boxShadow: "0 6px 14px rgba(22,163,74,0.18)",
+                        display: "inline-block",
+                      }}
+                    />
+                  }
+                />
+                <LegendItem
+                  label="Retake needed"
+                  icon={
+                    <span
+                      style={{
+                        width: 14,
+                        height: 14,
+                        borderRadius: 999,
+                        background: "#ef4444",
+                        border: "3px solid #ffffff",
+                        boxShadow: "0 6px 14px rgba(239,68,68,0.18)",
                         display: "inline-block",
                       }}
                     />
@@ -876,151 +973,119 @@ export default function OutreachMapDashboard() {
         ))}
       </div>
 
-      {selectedLocation && (
+      {suggestedCardLocations.length > 0 && (
         <div
           style={{
             position: "absolute",
-            right: 18,
+            left: 18,
             bottom: 18,
-            width: 310,
+            width: 360,
             maxWidth: "calc(100vw - 36px)",
             zIndex: 500,
-            pointerEvents: "none",
+            pointerEvents: "auto",
           }}
         >
           <div
             style={{
-              pointerEvents: "auto",
               borderRadius: 22,
-              padding: "16px 16px 14px",
-              background: "rgba(26,22,11,0.92)",
-              border: "1px solid rgba(245,200,66,0.14)",
-              color: "#fff7de",
+              padding: "14px 14px 12px",
+              background: "rgba(255,252,244,0.95)",
+              border: "1px solid rgba(190,155,70,0.16)",
               backdropFilter: "blur(18px)",
-              boxShadow: "0 22px 40px rgba(17,14,6,0.24)",
+              boxShadow: "0 18px 40px rgba(32,24,8,0.12)",
             }}
           >
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 12, marginBottom: 10 }}>
-              <div>
-                <p style={{ fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", color: "rgba(245,200,66,0.56)", marginBottom: 6 }}>
-                  Selected Hotspot
-                </p>
-                <h3 style={{ fontSize: 23, lineHeight: 1.08, letterSpacing: "-0.5px" }}>
-                  {selectedLocation.name}
-                </h3>
-              </div>
-              <button
-                onClick={() => setSelectedLocationId(null)}
-                style={{
-                  width: 30,
-                  height: 30,
-                  borderRadius: 999,
-                  background: "rgba(255,255,255,0.08)",
-                  color: "#fff7de",
-                  fontSize: 16,
-                  lineHeight: 1,
-                }}
-              >
-                ×
-              </button>
-            </div>
-
-            <p style={{ fontSize: 12.5, color: "rgba(255,247,222,0.72)", lineHeight: 1.5, marginBottom: 12 }}>
-              {selectedLocation.address}
+            <p
+              style={{
+                margin: "0 0 10px",
+                fontSize: 11,
+                letterSpacing: "0.08em",
+                textTransform: "uppercase",
+                color: "#8a7a50",
+              }}
+            >
+              Recommended hotspots
             </p>
-
-            {selectedLocation.regionName && (
-              <p style={{ fontSize: 12, color: "rgba(245,200,66,0.82)", marginBottom: 10 }}>
-                {selectedLocation.regionName} · need score {selectedLocation.regionNeedScore?.toFixed(2)}
-              </p>
-            )}
-
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
-              <span style={{ padding: "6px 10px", borderRadius: 999, background: selectedLocation.covered ? "rgba(34,197,94,0.16)" : "rgba(245,158,11,0.16)", color: selectedLocation.covered ? "#86efac" : "#fcd34d", fontSize: 11.5, fontWeight: 700 }}>
-                {selectedLocation.covered ? "Covered" : "Needs coverage"}
-              </span>
-              <span style={{ padding: "6px 10px", borderRadius: 999, background: priorityStyle[selectedLocation.derivedPriority].bg, color: "#fff7de", fontSize: 11.5, fontWeight: 700 }}>
-                {selectedLocation.derivedPriority} priority
-              </span>
-              <span style={{ padding: "6px 10px", borderRadius: 999, background: "rgba(255,255,255,0.07)", color: "rgba(255,247,222,0.76)", fontSize: 11.5, fontWeight: 700 }}>
-                {selectedLocation.distanceMiles.toFixed(1)} mi
-              </span>
-              <span style={{ padding: "6px 10px", borderRadius: 999, background: "rgba(255,255,255,0.07)", color: "rgba(255,247,222,0.76)", fontSize: 11.5, fontWeight: 700 }}>
-                Score {selectedLocation.priorityScore.toFixed(1)}
-              </span>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {suggestedCardLocations.map((location) => (
+                <PlacementTargetCard
+                  key={location.id}
+                  target={mapLocationToPlacementTarget(location)}
+                  selected={location.id === selectedLocationId}
+                  distanceLabel={`${location.distanceMiles.toFixed(1)} mi away`}
+                  onSelect={() => setSelectedLocationId(location.id)}
+                  onVerify={() => handleOpenVerificationForLocation(location)}
+                />
+              ))}
             </div>
+          </div>
+        </div>
+      )}
 
-            <p style={{ fontSize: 12, color: "rgba(255,247,222,0.76)", lineHeight: 1.55, marginBottom: 12 }}>
-              {selectedLocation.notes}
-            </p>
+      <TargetDetailsDrawer
+        open={Boolean(selectedLocation && selectedPlacementTarget)}
+        location={
+          selectedLocation
+            ? {
+                id: selectedLocation.id,
+                name: selectedLocation.name,
+                address: selectedLocation.address,
+                regionName: selectedLocation.regionName,
+                regionNeedScore: selectedLocation.regionNeedScore,
+                derivedPriority: selectedLocation.derivedPriority,
+                distanceMiles: selectedLocation.distanceMiles,
+                priorityScore: selectedLocation.priorityScore,
+                notes: selectedLocation.notes,
+                latestVerificationScore: selectedLocation.latestVerificationScore,
+                latestReviewReason: selectedLocation.latestReviewReason,
+                verifiedCount: selectedLocation.verifiedCount,
+              }
+            : null
+        }
+        target={selectedPlacementTarget}
+        suggestions={suggestedLocations.map((location) => ({
+          id: location.id,
+          target: mapLocationToPlacementTarget(location),
+          distanceLabel: `${location.distanceMiles.toFixed(1)} mi away`,
+          selected: location.id === selectedLocationId,
+        }))}
+        onClose={() => setSelectedLocationId(null)}
+        onOpenDirections={() => {
+          if (selectedLocation) {
+            openGoogleMapsLocation(selectedLocation);
+          }
+        }}
+        onOpenVerification={handleOpenVerificationForSelectedLocation}
+        onOpenVerificationForSuggestion={(locationId) => {
+          const nextLocation =
+            rankedLocations.find((location) => location.id === locationId) || null;
+          if (nextLocation) {
+            handleOpenVerificationForLocation(nextLocation);
+          }
+        }}
+        onSelectSuggestion={setSelectedLocationId}
+      />
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-              <button
-                onClick={() => openGoogleMapsLocation(selectedLocation)}
-                style={{
-                  width: "100%",
-                  borderRadius: 15,
-                  padding: "12px 14px",
-                  background: "rgba(255,255,255,0.08)",
-                  border: "1px solid rgba(255,255,255,0.10)",
-                  color: "#fff7de",
-                  fontSize: 12.5,
-                  fontWeight: 800,
-                  boxShadow: "0 10px 22px rgba(15,23,42,0.18)",
-                }}
-              >
-                Get directions
-              </button>
-              <button
-                onClick={() => void toggleCovered(selectedLocation.id, selectedLocation.covered)}
-                style={{
-                  width: "100%",
-                  borderRadius: 15,
-                  padding: "12px 14px",
-                  background: selectedLocation.covered
-                    ? "linear-gradient(135deg, #1f8f47 0%, #166534 100%)"
-                    : "linear-gradient(135deg, #f5c842 0%, #f59e0b 100%)",
-                  color: selectedLocation.covered ? "#effff3" : "#1a1000",
-                  fontSize: 12.5,
-                  fontWeight: 800,
-                  boxShadow: selectedLocation.covered
-                    ? "0 10px 22px rgba(34,197,94,0.22)"
-                    : "0 10px 22px rgba(245,200,66,0.22)",
-                }}
-              >
-                {selectedLocation.covered ? "Mark as uncovered" : "Mark hotspot as covered"}
-              </button>
-            </div>
+      <PlacementProofModal
+        open={isProofModalOpen}
+        target={activeVerificationTarget}
+        onClose={() => setIsProofModalOpen(false)}
+        onSubmitted={handleVerificationSubmitted}
+      />
 
-            {suggestedLocations.length > 0 && (
-              <div style={{ marginTop: 12 }}>
-                <p style={{ fontSize: 11, letterSpacing: "0.08em", textTransform: "uppercase", color: "rgba(245,200,66,0.50)", marginBottom: 8 }}>
-                  Nearby suggestions
-                </p>
-                <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-                  {suggestedLocations.map((location) => (
-                    <button
-                      key={location.id}
-                      onClick={() => setSelectedLocationId(location.id)}
-                      style={{
-                        width: "100%",
-                        textAlign: "left",
-                        borderRadius: 14,
-                        padding: "10px 11px",
-                        background: location.id === selectedLocation.id ? "rgba(245,200,66,0.12)" : "rgba(255,255,255,0.05)",
-                        border: `1px solid ${location.id === selectedLocation.id ? "rgba(245,200,66,0.20)" : "rgba(255,255,255,0.06)"}`,
-                        color: "#fff7de",
-                      }}
-                    >
-                      <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-                        <span style={{ fontSize: 12, fontWeight: 700 }}>{location.name}</span>
-                        <span style={{ fontSize: 11, color: "rgba(245,200,66,0.70)" }}>{location.distanceMiles.toFixed(1)} mi</span>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
+      {submissionResult && !isProofModalOpen && (
+        <div
+          style={{
+            position: "absolute",
+            left: 18,
+            bottom: suggestedCardLocations.length > 0 ? 304 : 18,
+            zIndex: 500,
+            pointerEvents: "none",
+          }}
+        >
+          <div style={statusChipStyle}>
+            Last proof: {submissionResult.status.replace("_", " ")} · score{" "}
+            {submissionResult.verificationScore}
           </div>
         </div>
       )}
@@ -1030,7 +1095,7 @@ export default function OutreachMapDashboard() {
           style={{
             position: "absolute",
             left: 18,
-            bottom: 18,
+            bottom: suggestedCardLocations.length > 0 ? 340 : 18,
             zIndex: 500,
             pointerEvents: "none",
           }}
@@ -1049,7 +1114,7 @@ export default function OutreachMapDashboard() {
   );
 }
 
-const toolButtonStyle: React.CSSProperties = {
+const toolButtonStyle: CSSProperties = {
   borderRadius: 999,
   padding: "10px 14px",
   background: "rgba(255,252,244,0.95)",
@@ -1061,7 +1126,7 @@ const toolButtonStyle: React.CSSProperties = {
   backdropFilter: "blur(18px)",
 };
 
-const fieldStyle: React.CSSProperties = {
+const fieldStyle: CSSProperties = {
   borderRadius: 14,
   border: "1px solid rgba(190,155,70,0.18)",
   background: "#ffffff",
@@ -1071,7 +1136,7 @@ const fieldStyle: React.CSSProperties = {
   outline: "none",
 };
 
-const statusChipStyle: React.CSSProperties = {
+const statusChipStyle: CSSProperties = {
   borderRadius: 999,
   padding: "10px 14px",
   background: "rgba(255,252,244,0.94)",
@@ -1161,7 +1226,7 @@ function getLayeredLocations(
 
   if (layers.uncovered) {
     for (const location of locations) {
-      if (!location.covered) {
+      if (!isLocationVisuallyCovered(location)) {
         merged.set(location.id, location);
       }
     }
@@ -1169,7 +1234,7 @@ function getLayeredLocations(
 
   if (layers.covered) {
     for (const location of locations) {
-      if (location.covered) {
+      if (isLocationVisuallyCovered(location)) {
         merged.set(location.id, location);
       }
     }
@@ -1209,7 +1274,7 @@ function isRecommendedLocation(
   highlightedRegionCodes: Set<string>,
 ) {
   return (
-    !location.covered &&
+    !isLocationVisuallyCovered(location) &&
     location.derivedPriority === "High" &&
     location.priorityScore >= 11.5 &&
     (
@@ -1239,7 +1304,7 @@ function rankLocations(
   return locations
     .map((location) => {
       const needComponent = getNeedComponent(location, highlightedRegionCodes);
-      const coverageComponent = location.covered ? -2.5 : 3.8;
+      const coverageComponent = isLocationVisuallyCovered(location) ? -2.5 : 3.8;
       const suitabilityScore = getSuitabilityScore(location.category);
       const distanceComponent = getDistanceComponent(location.distanceMiles);
       const gapBonus = getOutreachGapBonus(location, highlightedRegionCodes, regionLocationCounts);
@@ -1346,6 +1411,22 @@ function getDerivedPriority(score: number): "High" | "Medium" | "Low" {
   return "Low";
 }
 
+function getLocationPlacementStatus(
+  location: Pick<MapLocation, "placementStatus" | "covered">,
+): PlacementTargetStatus {
+  if (location.placementStatus) {
+    return location.placementStatus;
+  }
+
+  return location.covered ? "verified" : "not_started";
+}
+
+function isLocationVisuallyCovered(
+  location: Pick<MapLocation, "placementStatus" | "covered">,
+) {
+  return getLocationPlacementStatus(location) === "verified";
+}
+
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }
@@ -1395,7 +1476,7 @@ function LegendItem({
   icon,
   label,
 }: {
-  icon: React.ReactNode;
+  icon: ReactNode;
   label: string;
 }) {
   return (

@@ -1,5 +1,5 @@
 const {
-  getStoredHotspots,
+  getStoredHotspotsWithPlacementSummary,
   importHotspotsFromOsm,
   updateHotspotStatus,
 } = require("../services/osmHotspotService");
@@ -25,7 +25,12 @@ const getAllLocations = (req, res) => {
   const lng = parseOptionalFloat(req.query.lng);
   const radiusMiles = parseOptionalFloat(req.query.radiusMiles);
   const limit = parseOptionalFloat(req.query.limit);
-  const locations = getStoredHotspots({ lat, lng, radiusMiles, limit });
+  const locations = getStoredHotspotsWithPlacementSummary({
+    lat,
+    lng,
+    radiusMiles,
+    limit,
+  });
 
   res.status(200).json({
     success: true,
