@@ -1,12 +1,11 @@
 "use client";
 
-import Link from "next/link";
+import { useState } from "react";
 import { usePathname } from "next/navigation";
-import { useAuth } from "@/context/AuthContext";
 
 const META: Record<string, { title: string; sub: string }> = {
   "/":            { title: "Welcome back 👋",   sub: "Here's what's happening in your community today." },
-  "/map":         { title: "Resource Map 🗺️",   sub: "Explore flyering zones and food access locations." },
+  "/map":         { title: "Outreach Coverage Map", sub: "Track real flyer locations and mark businesses as covered." },
   "/profile":     { title: "Your Profile ✨",    sub: "Track your volunteer contributions and impact." },
   "/leaderboard": { title: "Leaderboard 🏆",     sub: "Top volunteers making a difference this month." },
   "/printers":    { title: "Nearby Printers 🖨️", sub: "Find a printer close to you for your flyers." },
@@ -15,20 +14,22 @@ const META: Record<string, { title: string; sub: string }> = {
   "/onboarding":  { title: "Log in",            sub: "Sign in or create an account to continue." },
 };
 
-function getInitial(name: string): string {
-  if (!name?.trim()) return "?";
-  return name.trim()[0].toUpperCase();
-}
-
 export default function Header() {
   const pathname = usePathname();
-  const baseMeta = META[pathname] ?? META["/"];
-  const { user } = useAuth();
-  const title =
-    pathname === "/" && user
-      ? `Welcome back, ${user.username} 👋`
-      : baseMeta.title;
-  const meta = { ...baseMeta, title };
+  const meta = META[pathname] ?? META["/"];
+  const isMapPage = pathname === "/map";
+  const [searchValue, setSearchValue] = useState("");
+
+  function submitSearch() {
+    const query = searchValue.trim();
+    if (!query || !isMapPage) return;
+
+    window.dispatchEvent(
+      new CustomEvent("lemontree:map-search", {
+        detail: query,
+      }),
+    );
+  }
 
   return (
     <header
@@ -69,26 +70,77 @@ export default function Header() {
       {/* Right: Controls */}
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         {/* Search bar */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            padding: "7px 14px",
-            borderRadius: 10,
-            background: "rgba(0,0,0,0.045)",
-            border: "1px solid rgba(0,0,0,0.07)",
-            color: "#9a8a60",
-            fontSize: 12.5,
-            cursor: "text",
-            width: 170,
-          }}
-        >
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
-            <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-          </svg>
-          Search…
-        </div>
+        {isMapPage ? (
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              submitSearch();
+            }}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "4px 6px 4px 12px",
+              borderRadius: 12,
+              background: "rgba(0,0,0,0.045)",
+              border: "1px solid rgba(0,0,0,0.07)",
+              width: 280,
+            }}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#9a8a60" strokeWidth="2.2" strokeLinecap="round">
+              <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+            <input
+              value={searchValue}
+              onChange={(event) => setSearchValue(event.target.value)}
+              placeholder="Search a NYC address or neighborhood"
+              style={{
+                flex: 1,
+                minWidth: 0,
+                border: "none",
+                background: "transparent",
+                color: "#5f502d",
+                fontSize: 12.5,
+                outline: "none",
+              }}
+            />
+            <button
+              type="submit"
+              style={{
+                borderRadius: 9,
+                padding: "8px 10px",
+                background: "linear-gradient(135deg, #f5c842 0%, #f59e0b 100%)",
+                color: "#1a1000",
+                fontSize: 11.5,
+                fontWeight: 800,
+                boxShadow: "0 4px 12px rgba(245,200,66,0.18)",
+              }}
+            >
+              Go
+            </button>
+          </form>
+        ) : (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "7px 14px",
+              borderRadius: 10,
+              background: "rgba(0,0,0,0.045)",
+              border: "1px solid rgba(0,0,0,0.07)",
+              color: "#9a8a60",
+              fontSize: 12.5,
+              cursor: "text",
+              width: 170,
+            }}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+              <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+            Search…
+          </div>
+        )}
 
         {/* Bell */}
         <button
@@ -125,8 +177,7 @@ export default function Header() {
         </button>
 
         {/* Avatar */}
-        <Link
-          href="/profile"
+        <div
           style={{
             width: 36,
             height: 36,
@@ -140,11 +191,10 @@ export default function Header() {
             color: "#1a1000",
             cursor: "pointer",
             boxShadow: "0 2px 10px rgba(245,200,66,0.35)",
-            textDecoration: "none",
           }}
         >
-          {user ? getInitial(user.username) : "?"}
-        </Link>
+          SG
+        </div>
       </div>
     </header>
   );

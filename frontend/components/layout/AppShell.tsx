@@ -2,11 +2,8 @@
 
 import Sidebar from "./Sidebar";
 import Header from "./Header";
-import { useAuth } from "@/context/AuthContext";
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
-  const { user } = useAuth();
-
   return (
     <div
       style={{
@@ -17,7 +14,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         fontFamily: "'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif",
       }}
     >
-      {user?.agreed_to_terms && <Sidebar />}
+      <Sidebar />
       <div style={{ display: "flex", flexDirection: "column", flex: 1, overflow: "hidden", minWidth: 0 }}>
         <Header />
         <main style={{ flex: 1, overflowY: "auto", overflowX: "hidden" }}>
