@@ -18,6 +18,7 @@ import type {
   MapNeedRegion,
   MapViewportState,
 } from "./OutreachMapDashboard";
+import type { PlacementTargetStatus } from "@/types/placement";
 import { latLngBounds } from "leaflet";
 
 const mapCenter: LatLngExpression = [40.7395, -73.9363];
@@ -27,15 +28,31 @@ const nycBounds = latLngBounds(
   [40.9176, -73.7004],
 );
 
-function createMarkerIcon(covered: boolean, selected: boolean, recommended: boolean) {
+function createMarkerIcon(
+  status: PlacementTargetStatus,
+  selected: boolean,
+  recommended: boolean,
+) {
   const size = 18;
-  const fill = covered ? "#16a34a" : recommended ? "#60a5fa" : "#f59e0b";
-  const ring = selected ? "#1f1a0b" : recommended ? "#eff6ff" : "#ffffff";
-  const shadow = covered
-    ? "rgba(22,163,74,0.22)"
-    : recommended
-      ? "rgba(96,165,250,0.30)"
-      : "rgba(245,158,11,0.24)";
+  const fill =
+    status === "verified"
+      ? "#16a34a"
+      : status === "pending_review"
+        ? "#f59e0b"
+        : status === "rejected"
+          ? "#ef4444"
+          : "#64748b";
+  const ring = selected ? "#1f1a0b" : recommended ? "#dbeafe" : "#ffffff";
+  const shadow =
+    status === "verified"
+      ? "rgba(22,163,74,0.22)"
+      : status === "pending_review"
+        ? "rgba(245,158,11,0.24)"
+        : status === "rejected"
+          ? "rgba(239,68,68,0.24)"
+          : recommended
+            ? "rgba(96,165,250,0.30)"
+            : "rgba(100,116,139,0.22)";
 
   return divIcon({
     className: "",
@@ -54,15 +71,34 @@ function createMarkerIcon(covered: boolean, selected: boolean, recommended: bool
   });
 }
 
-function createClusterIcon(count: number, kind: "recommended" | "uncovered") {
+function createClusterIcon(
+  count: number,
+  kind: "recommended" | "not_started" | "pending_review" | "rejected",
+) {
   const background =
-    kind === "recommended" ? "rgba(96,165,250,0.94)" : "rgba(217,119,6,0.92)";
+    kind === "recommended"
+      ? "rgba(96,165,250,0.94)"
+      : kind === "pending_review"
+        ? "rgba(245,158,11,0.92)"
+        : kind === "rejected"
+          ? "rgba(239,68,68,0.92)"
+          : "rgba(100,116,139,0.92)";
   const shadow =
     kind === "recommended"
       ? "rgba(96,165,250,0.24)"
-      : "rgba(217,119,6,0.22)";
+      : kind === "pending_review"
+        ? "rgba(217,119,6,0.22)"
+        : kind === "rejected"
+          ? "rgba(239,68,68,0.22)"
+          : "rgba(100,116,139,0.22)";
   const ring =
-    kind === "recommended" ? "rgba(239,246,255,0.96)" : "rgba(255,246,214,0.95)";
+    kind === "recommended"
+      ? "rgba(239,246,255,0.96)"
+      : kind === "pending_review"
+        ? "rgba(255,246,214,0.95)"
+        : kind === "rejected"
+          ? "rgba(254,226,226,0.96)"
+          : "rgba(241,245,249,0.95)";
 
   return divIcon({
     className: "",
@@ -291,12 +327,13 @@ function LocationMarkers({
             const location = cluster.locations[0];
             const selected = location.id === selectedLocation?.id;
             const recommended = recommendedIdSet.has(location.id);
+            const placementStatus = getLocationPlacementStatus(location);
 
             return (
               <Fragment key={location.id}>
                 <Marker
                   position={[location.lat, location.lng]}
-                  icon={createMarkerIcon(location.covered, selected, recommended)}
+                  icon={createMarkerIcon(placementStatus, selected, recommended)}
                   eventHandlers={{
                     click: () => onSelect(location.id),
                   }}
@@ -306,7 +343,7 @@ function LocationMarkers({
                       <strong>{location.name}</strong>
                       <div style={{ marginTop: 4 }}>{location.address}</div>
                       <div style={{ marginTop: 6 }}>
-                        {location.covered ? "Covered" : "Needs coverage"} · {location.category}
+                        {getStatusLabel(placementStatus)} · {location.category}
                       </div>
                     </div>
                   </Popup>
@@ -350,12 +387,13 @@ function LocationMarkers({
       {locations.map((location) => {
         const selected = location.id === selectedLocation?.id;
         const recommended = recommendedIdSet.has(location.id);
+        const placementStatus = getLocationPlacementStatus(location);
 
         return (
           <Fragment key={location.id}>
             <Marker
               position={[location.lat, location.lng]}
-              icon={createMarkerIcon(location.covered, selected, recommended)}
+              icon={createMarkerIcon(placementStatus, selected, recommended)}
               eventHandlers={{
                 click: () => onSelect(location.id),
               }}
@@ -365,7 +403,7 @@ function LocationMarkers({
                   <strong>{location.name}</strong>
                   <div style={{ marginTop: 4 }}>{location.address}</div>
                   <div style={{ marginTop: 6 }}>
-                    {location.covered ? "Covered" : "Needs coverage"} · {location.category}
+                    {getStatusLabel(placementStatus)} · {location.category}
                   </div>
                 </div>
               </Popup>
@@ -389,17 +427,21 @@ function clusterLocations(
       id: string;
       lat: number;
       lng: number;
-      kind: "recommended" | "uncovered";
+      kind: "recommended" | "not_started" | "pending_review" | "rejected";
       locations: MapLocation[];
     }
   >();
 
   for (const location of locations) {
-    if (location.covered) {
+    const placementStatus = getLocationPlacementStatus(location);
+
+    if (placementStatus === "verified") {
       continue;
     }
 
-    const kind = recommendedIdSet.has(location.id) ? "recommended" : "uncovered";
+    const kind = recommendedIdSet.has(location.id)
+      ? "recommended"
+      : placementStatus;
     const cellKey = `${kind}:${Math.floor(location.lat / cellSize)}:${Math.floor(location.lng / cellSize)}`;
     const existing = clusters.get(cellKey);
 
@@ -423,4 +465,19 @@ function clusterLocations(
   }
 
   return Array.from(clusters.values());
+}
+
+function getLocationPlacementStatus(location: MapLocation): PlacementTargetStatus {
+  if (location.placementStatus) {
+    return location.placementStatus;
+  }
+
+  return location.covered ? "verified" : "not_started";
+}
+
+function getStatusLabel(status: PlacementTargetStatus) {
+  if (status === "verified") return "Covered";
+  if (status === "pending_review") return "Pending review";
+  if (status === "rejected") return "Retake needed";
+  return "Needs coverage";
 }

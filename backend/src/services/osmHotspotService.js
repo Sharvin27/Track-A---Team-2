@@ -1,5 +1,9 @@
 const db = require("../db/database");
 const { findNeedRegionForPoint } = require("./needRegionService");
+const {
+  attachSummariesToHotspots,
+  getTargetSummary,
+} = require("../data/placementRepository");
 
 const OVERPASS_ENDPOINTS = (
   process.env.OVERPASS_ENDPOINTS ||
@@ -252,6 +256,27 @@ function getStoredHotspots({ lat, lng, radiusMiles, limit = 5000 }) {
   return allRows.slice(0, limit);
 }
 
+function getStoredHotspotsWithPlacementSummary(options = {}) {
+  return attachSummariesToHotspots(getStoredHotspots(options));
+}
+
+function getHotspotById(id) {
+  return normalizeRow(selectByIdStatement.get(id));
+}
+
+function getHotspotByIdWithPlacementSummary(id) {
+  const hotspot = getHotspotById(id);
+  if (!hotspot) return null;
+
+  const summary = getTargetSummary(`hotspot:${hotspot.id}`);
+
+  return {
+    ...hotspot,
+    placementTargetId: `hotspot:${hotspot.id}`,
+    ...summary,
+  };
+}
+
 function updateHotspotStatus(id, updates) {
   const existing = selectByIdStatement.get(id);
   if (!existing) return null;
@@ -271,7 +296,7 @@ function updateHotspotStatus(id, updates) {
     updatedAt: now,
   });
 
-  return normalizeRow(selectByIdStatement.get(id));
+  return getHotspotByIdWithPlacementSummary(id);
 }
 
 function normalizeRow(row) {
@@ -489,5 +514,8 @@ function getDistanceMiles(fromLat, fromLng, toLat, toLng) {
 module.exports = {
   importHotspotsFromOsm,
   getStoredHotspots,
+  getStoredHotspotsWithPlacementSummary,
+  getHotspotById,
+  getHotspotByIdWithPlacementSummary,
   updateHotspotStatus,
 };
