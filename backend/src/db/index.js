@@ -1,5 +1,4 @@
 const { Pool } = require("pg");
-
 let pool;
 
 function getConnectionString() {

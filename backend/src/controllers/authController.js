@@ -1,6 +1,6 @@
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
-const { pool } = require("../db");
+const { query } = require("../db");
 
 const SALT_ROUNDS = 12;
 const JWT_SECRET = process.env.JWT_SECRET || "change-me-in-production";
@@ -27,7 +27,7 @@ async function signup(req, res) {
     }
 
     const password_hash = await bcrypt.hash(password, SALT_ROUNDS);
-    const result = await pool.query(
+    const result = await query(
       `INSERT INTO users (username, email, password_hash) VALUES ($1, $2, $3)
        RETURNING id, username, email, agreed_to_terms, created_at`,
       [username.trim(), email.trim().toLowerCase(), password_hash]
@@ -55,7 +55,7 @@ async function login(req, res) {
       return res.status(400).json({ error: "Email and password are required." });
     }
 
-    const result = await pool.query(
+    const result = await query(
       "SELECT id, username, email, password_hash, agreed_to_terms, created_at FROM users WHERE email = $1",
       [email.trim().toLowerCase()]
     );
@@ -89,7 +89,7 @@ async function me(req, res) {
       return res.status(401).json({ error: "Not authenticated." });
     }
     const decoded = jwt.verify(token, JWT_SECRET);
-    const result = await pool.query(
+    const result = await query(
       "SELECT id, username, email, agreed_to_terms, created_at FROM users WHERE id = $1",
       [decoded.userId]
     );
@@ -115,11 +115,11 @@ async function agreeToTerms(req, res) {
       return res.status(401).json({ error: "Not authenticated." });
     }
     const decoded = jwt.verify(token, JWT_SECRET);
-    await pool.query(
+    await query(
       "UPDATE users SET agreed_to_terms = TRUE WHERE id = $1 RETURNING id, username, email, agreed_to_terms, created_at",
       [decoded.userId]
     );
-    const result = await pool.query(
+    const result = await query(
       "SELECT id, username, email, agreed_to_terms, created_at FROM users WHERE id = $1",
       [decoded.userId]
     );

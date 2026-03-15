@@ -1,199 +1,131 @@
-# Track-A---Team-2
-Morgan Stanley Hackathon - Lemontree
+# Lemontree Volunteer Hub
 
-# Track A – Team 2  
-### Lemontree Flyering Platform
+Lemontree Volunteer Hub is a hackathon MVP for coordinating flyer-based outreach that helps neighbors find free food resources. The product combines volunteer onboarding, hotspot discovery, route tracking, nearby printing support, and food-need-aware map prioritization.
 
-This project is built for the hackathon to improve the flyering workflow for Lemontree volunteers.  
-The platform helps volunteers identify high-impact locations to distribute flyers and helps people quickly find nearby food resources.
+This README is anchored to the product definition in [PRD.md](/d:/sharvin1/Hackathons/Track-A---Team-2/PRD.md). Where the current build differs from the intended product, the gaps are called out below so the team can focus on demo readiness.
 
-The goal is to make flyering more effective and accessible by combining:
-- smart mapping
-- multilingual flyers
-- volunteer coordination
-- AI-assisted resource discovery
+## What the product does
 
----
+- Helps volunteers find high-priority outreach locations on a map.
+- Guides new volunteers through onboarding and the flyering workflow.
+- Tracks volunteer walking sessions and stop points.
+- Helps volunteers find nearby print shops for flyer production.
+- Surfaces higher-need regions so outreach effort can be directed intentionally.
 
-# Project Overview
+## Current implementation snapshot
 
-The platform helps two groups:
+### Frontend
 
-### Volunteers
-- find good locations to distribute flyers
-- identify areas with higher pedestrian traffic
-- coordinate flyering with other volunteers
+- Framework: Next.js App Router with React 19 and TypeScript.
+- Main pages present: home, map, tracker, printers, leaderboard, profile, onboarding, and guide.
+- API proxy routes present for printer search and Google Places autocomplete/details.
 
-### People in Need
-- scan a flyer
-- quickly find nearby food resources
-- access information in multiple languages
+### Backend
 
----
+- Framework: Express.
+- Data/services present for hotspot import, need-region import, auth, and session persistence.
+- Session storage currently includes a JSON-backed store for tracker sessions.
+- Auth expects a PostgreSQL-compatible database connection.
 
-# Tech Stack
+## Repository structure
 
-Frontend
-- Next.js
-- React
-- Tailwind CSS
+```text
+backend/
+  src/
+    app.js
+    server.js
+    controllers/
+    routes/
+    services/
+    data/
+    db/
+frontend/
+  app/
+  components/
+  context/
+  lib/
+README.md
+PRD.md
+```
 
-Backend
-- Node.js
-- Express
+## Local setup
 
-Database (planned)
-- PostgreSQL / Supabase
+### Frontend
 
-Deployment
-- Vercel (frontend)
-
----
-
-# Repository Structure
-
-
-project
-├── frontend
-│ ├── app
-│ ├── components
-│ └── package.json
-│
-├── backend
-│ ├── src
-│ │ ├── routes
-│ │ ├── controllers
-│ │ └── data
-│ └── package.json
-│
-├── .gitignore
-└── README.md
-
-
----
-
-# Getting Started
-
-Follow these steps to run the project locally.
-
----
-
-# 1 Clone the Repository
-
-
-git clone https://github.com/Sharvin27/Track-A---Team-2.git
-
-cd Track-A---Team-2
-
-
----
-
-# 2 Install Dependencies
-
-## Frontend
-
-
+```bash
 cd frontend
 npm install
+npm run dev
+```
 
+Default URL: `http://localhost:3000`
 
-## Backend
+### Backend
 
-Open a new terminal.
-
-
+```bash
 cd backend
 npm install
-
-
----
-
-# Running the Project
-
-You need **two terminals**.
-
----
-
-## Start the Frontend
-
-
-cd frontend
 npm run dev
+```
 
+Default URL: `http://localhost:5001`
 
-Frontend runs at:
+## Environment notes
 
+### Backend
 
-http://localhost:3000
+See [`backend/.env.example`](/d:/sharvin1/Hackathons/Track-A---Team-2/backend/.env.example).
 
+Required for auth:
 
----
+- `PORT`
+- `DATABASE_URL`
+- `JWT_SECRET`
 
-## Start the Backend
+### Frontend
 
-Open another terminal:
+The frontend currently references more than one API base env name in code:
 
+- `NEXT_PUBLIC_API_URL`
+- `NEXT_PUBLIC_API_BASE_URL`
+- `GOOGLE_MAPS_API_KEY`
 
-cd backend
-npm run dev
+For demo stability, these should be consolidated.
 
+## Demo path
 
-Backend runs at:
+The intended demo path from the current product direction is:
 
+1. Land on the home page and enter the volunteer flow.
+2. Read the guide / get-started content.
+3. Use the map to show high-need outreach targets.
+4. Use the printer finder to show operational support for volunteers.
+5. Start and stop a tracker session to demonstrate route logging.
 
-http://localhost:5001
+## Known product and engineering gaps
 
+- Auth routes exist in the backend but are not currently mounted in [`backend/src/app.js`](/d:/sharvin1/Hackathons/Track-A---Team-2/backend/src/app.js).
+- Session routes exist in the backend but are not currently mounted in [`backend/src/app.js`](/d:/sharvin1/Hackathons/Track-A---Team-2/backend/src/app.js).
+- The frontend references `/getstarted`, while the repo currently contains [`frontend/app/guide/page.tsx`](/d:/sharvin1/Hackathons/Track-A---Team-2/frontend/app/guide/page.tsx) rather than a `/getstarted` route.
+- The frontend mixes `NEXT_PUBLIC_API_URL` and `NEXT_PUBLIC_API_BASE_URL`.
+- The tracker references backend session APIs that may not respond until session routes are wired.
+- The onboarding/auth flow depends on backend auth plus a configured database.
 
----
+## Immediate demo task list
 
-# Git Workflow
+Ordered by severity and urgency for an immediate working demo:
 
-To avoid conflicts, **do NOT push directly to the main branch.**
+1. `Critical`: Mount `authRoutes` and `sessionRoutes` in [`backend/src/app.js`](/d:/sharvin1/Hackathons/Track-A---Team-2/backend/src/app.js).
+2. `Critical`: Fix the get-started route mismatch by either creating `/getstarted` or changing all links back to `/guide`.
+3. `Critical`: Verify the auth flow end to end with a real `DATABASE_URL` and `JWT_SECRET`.
+4. `High`: Standardize the frontend API base environment variable naming and update all callers.
+5. `High`: Smoke-test the tracker create/save path against `/api/sessions`.
+6. `High`: Smoke-test the map import and load flow against `/api/locations` and `/api/need-regions`.
+7. `High`: Confirm the printer finder works with a valid `GOOGLE_MAPS_API_KEY`.
+8. `Medium`: Replace broken text encoding artifacts across UI copy before demo.
+9. `Medium`: Add one scripted demo account and a seeded dataset for deterministic presentations.
+10. `Medium`: Add a one-page demo runbook with exact clicks and fallback screens.
 
-Always create a new branch when working on a feature.
+## Product definition
 
----
-
-## Create a new branch
-
-
-git checkout -b feature/your-feature-name
-
-
-Example:
-
-
-git checkout -b feature/map-page
-
-
----
-
-## Commit your changes
-
-
-git add .
-git commit -m "describe your changes"
-
-
----
-
-## Push your branch
-
-
-git push origin feature/your-feature-name
-
-
-Then open a **Pull Request on GitHub**.
-
----
-
-# Updating Your Local Repository
-
-Before starting work, pull the latest code.
-
-
-git checkout main
-git pull origin main
-
-
-Then create your feature branch.
+For scope, goals, users, current status, and demo priorities, see [PRD.md](/d:/sharvin1/Hackathons/Track-A---Team-2/PRD.md).

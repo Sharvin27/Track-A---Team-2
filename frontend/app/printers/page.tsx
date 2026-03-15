@@ -1,165 +1,461 @@
+"use client";
+
+import { useState, useEffect, useRef } from "react";
 import PageContainer from "@/components/layout/PageContainer";
 
-const printers = [
-  {
-    name: "Staples – Midtown Manhattan",
-    address: "205 W 42nd St, New York, NY 10036",
-    distance: "0.3 mi",
-    hours: "Mon–Fri 8am–9pm · Sat 9am–6pm · Sun 10am–5pm",
-    open: true,
-    price: "$0.09/page B&W · $0.49/page Color",
-    notes: "Self-service kiosks available. Bring your USB or email your file.",
-    tags: ["Self-Service", "Walk-In"],
-    emoji: "🖨️",
-  },
-  {
-    name: "The UPS Store – Brooklyn Heights",
-    address: "135 Montague St, Brooklyn, NY 11201",
-    distance: "1.1 mi",
-    hours: "Mon–Fri 8:30am–6:30pm · Sat 10am–4pm · Closed Sun",
-    open: true,
-    price: "$0.12/page B&W · $0.65/page Color",
-    notes: "Can print from email or Google Drive. Ask for volunteer discount.",
-    tags: ["Full-Service", "Discount Available"],
-    emoji: "📦",
-  },
-  {
-    name: "FedEx Office – Lower East Side",
-    address: "27 Orchard St, New York, NY 10002",
-    distance: "1.8 mi",
-    hours: "Open 24/7",
-    open: true,
-    price: "$0.10/page B&W · $0.55/page Color",
-    notes: "24/7 access with self-service. Best for large batches overnight.",
-    tags: ["24/7", "Large Volume"],
-    emoji: "📮",
-  },
-  {
-    name: "Brooklyn Public Library – Central",
-    address: "10 Grand Army Plaza, Brooklyn, NY 11238",
-    distance: "2.4 mi",
-    hours: "Mon–Thu 9am–8pm · Fri–Sat 10am–6pm · Sun 1pm–5pm",
-    open: false,
-    price: "$0.15/page B&W only",
-    notes: "Library card required. Affordable option for community members.",
-    tags: ["Library", "Low-Cost"],
-    emoji: "📚",
-  },
-  {
-    name: "Office Depot – East Harlem",
-    address: "1720 Lexington Ave, New York, NY 10029",
-    distance: "3.2 mi",
-    hours: "Mon–Sat 8am–8pm · Sun 10am–6pm",
-    open: true,
-    price: "$0.09/page B&W · $0.45/page Color",
-    notes: "Wide-format printing available. Good for posters.",
-    tags: ["Wide Format", "Walk-In"],
-    emoji: "🗂️",
-  },
+function getMiles(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 3958.8;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function getEmoji(name: string): string {
+  const n = name.toLowerCase();
+  if (n.includes("fedex") || n.includes("kinkos")) return "📮";
+  if (n.includes("ups")) return "📦";
+  if (n.includes("staples")) return "🖊️";
+  if (n.includes("library")) return "📚";
+  if (n.includes("office depot") || n.includes("officemax")) return "🗂️";
+  return "🖨️";
+}
+
+/** Known per-page print rates for major chains. */
+const CHAIN_PRICES: { match: RegExp; bw: string; color: string }[] = [
+  { match: /staples/i,                  bw: "$0.09/page B&W", color: "$0.49/page Color" },
+  { match: /fedex|kinkos/i,             bw: "$0.12/page B&W", color: "$0.55/page Color" },
+  { match: /ups\s*store/i,              bw: "$0.14/page B&W", color: "$0.79/page Color" },
+  { match: /office\s*depot|officemax/i, bw: "$0.09/page B&W", color: "$0.45/page Color" },
 ];
 
+const PRICE_LEVEL_LABEL: Record<string, { label: string; color: string; bg: string }> = {
+  PRICE_LEVEL_FREE:           { label: "Free", color: "#15803d", bg: "#dcfce7" },
+  PRICE_LEVEL_INEXPENSIVE:    { label: "$",    color: "#15803d", bg: "#dcfce7" },
+  PRICE_LEVEL_MODERATE:       { label: "$$",   color: "#92400e", bg: "rgba(245,200,66,0.18)" },
+  PRICE_LEVEL_EXPENSIVE:      { label: "$$$",  color: "#9a3412", bg: "#ffedd5" },
+  PRICE_LEVEL_VERY_EXPENSIVE: { label: "$$$$", color: "#7f1d1d", bg: "#fee2e2" },
+};
+
+interface Suggestion {
+  placeId: string;
+  label: string;
+  main: string;
+  secondary: string;
+}
+
+interface Printer {
+  id: string;
+  name: string;
+  address: string;
+  distance: number;
+  hours: string;
+  lat: number;
+  lng: number;
+  tags: string[];
+  priceLevel?: string;
+}
+
+interface PlacesResult {
+  id: string;
+  displayName: { text: string };
+  formattedAddress: string;
+  location: { latitude: number; longitude: number };
+  currentOpeningHours?: { openNow: boolean };
+  rating?: number;
+  priceLevel?: string;
+  businessStatus?: string;
+}
+
+async function fetchPrinters(lat: number, lng: number): Promise<Printer[]> {
+  const res = await fetch(`/api/printers?lat=${lat}&lng=${lng}`);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error ?? "Failed to fetch printers");
+
+  return (data.results as PlacesResult[])
+    .filter((p) => p.businessStatus !== "CLOSED_PERMANENTLY")
+    .map((p) => {
+      const elLat = p.location.latitude;
+      const elLng = p.location.longitude;
+      const openNow = p.currentOpeningHours?.openNow;
+      const tags: string[] = [];
+      if (openNow === true) tags.push("Open Now");
+      if (p.rating) tags.push(`⭐ ${p.rating}`);
+      return {
+        id: p.id,
+        name: p.displayName.text,
+        address: p.formattedAddress,
+        distance: getMiles(lat, lng, elLat, elLng),
+        hours: openNow != null ? (openNow ? "Open Now" : "Closed Now") : "Hours not listed",
+        lat: elLat,
+        lng: elLng,
+        tags,
+        priceLevel: p.priceLevel,
+      };
+    })
+    .sort((a, b) => a.distance - b.distance);
+}
+
 export default function PrintersPage() {
+  const [printers, setPrinters] = useState<Printer[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [sort, setSort] = useState("distance");
+  const [searchInput, setSearchInput] = useState("");
+  const [locationLabel, setLocationLabel] = useState<string | null>(null);
+  const [hasFetched, setHasFetched] = useState(false);
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [activeSuggestion, setActiveSuggestion] = useState(-1);
+
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const coordCache = useRef<Record<string, { lat: number; lng: number }>>({});
+
+  const searchBarStyle: React.CSSProperties = {
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    padding: "10px 16px",
+    background: "#ffffff",
+    border: "1px solid rgba(190,155,70,0.22)",
+    boxShadow: "0 1px 4px rgba(0,0,0,0.05)",
+  };
+
+  const cardStyle: React.CSSProperties = {
+    display: "flex",
+    gap: 18,
+    padding: "20px 22px",
+    background: "#ffffff",
+    border: "1px solid rgba(190,155,70,0.18)",
+    borderRadius: 16,
+    boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
+  };
+
+  const buttonPrimary: React.CSSProperties = {
+    padding: "10px 18px",
+    borderRadius: 12,
+    background: "#f5c842",
+    color: "#1a1000",
+    fontSize: 13,
+    fontWeight: 600,
+    border: "none",
+    cursor: "pointer",
+    boxShadow: "0 2px 8px rgba(245,200,66,0.3)",
+    whiteSpace: "nowrap",
+  };
+
+  const tagStyle: React.CSSProperties = {
+    fontSize: 11.5,
+    fontWeight: 500,
+    padding: "3px 10px",
+    borderRadius: 8,
+    background: "#fdf8ec",
+    border: "1px solid rgba(190,155,70,0.22)",
+    color: "#7a6a40",
+  };
+
+  useEffect(() => {
+    function onClickOutside(e: MouseEvent) {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setShowSuggestions(false);
+      }
+    }
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, []);
+
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (!searchInput.trim() || searchInput.length < 2) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+    debounceRef.current = setTimeout(async () => {
+      const res = await fetch(`/api/autocomplete?input=${encodeURIComponent(searchInput)}`);
+      const data = await res.json();
+      const list: Suggestion[] = data.suggestions ?? [];
+      setSuggestions(list);
+      setShowSuggestions(list.length > 0);
+      setActiveSuggestion(-1);
+      list.forEach((s) => {
+        if (coordCache.current[s.placeId]) return;
+        fetch(`/api/place?id=${s.placeId}`)
+          .then((r) => r.json())
+          .then((d) => { if (d.lat) coordCache.current[s.placeId] = d; })
+          .catch(() => {});
+      });
+    }, 150);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [searchInput]);
+
+  async function load(lat: number, lng: number, label: string) {
+    setLoading(true);
+    setError(null);
+    setHasFetched(true);
+    setLocationLabel(label);
+    try {
+      const results = await fetchPrinters(lat, lng);
+      setPrinters(results);
+      if (results.length === 0)
+        setError("No print shops found within 10 km. Try a different location.");
+    } catch {
+      setError("Failed to fetch print shops. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function selectSuggestion(s: Suggestion) {
+    setSearchInput(s.label);
+    setShowSuggestions(false);
+    setSuggestions([]);
+    const cached = coordCache.current[s.placeId];
+    if (cached) {
+      load(cached.lat, cached.lng, s.main);
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    const res = await fetch(`/api/place?id=${s.placeId}`);
+    const data = await res.json();
+    if (!res.ok) {
+      setLoading(false);
+      setError("Couldn't resolve that location. Please try again.");
+      return;
+    }
+    load(data.lat, data.lng, s.main);
+  }
+
+  function handleUseLocation() {
+    if (!navigator.geolocation) {
+      setError("Geolocation is not supported by your browser.");
+      return;
+    }
+    setLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => load(pos.coords.latitude, pos.coords.longitude, "your location"),
+      () => {
+        setLoading(false);
+        setError("Location access denied. Try searching by address instead.");
+      }
+    );
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (!showSuggestions || suggestions.length === 0) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setActiveSuggestion((i) => Math.min(i + 1, suggestions.length - 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setActiveSuggestion((i) => Math.max(i - 1, 0));
+    } else if (e.key === "Enter" && activeSuggestion >= 0) {
+      e.preventDefault();
+      selectSuggestion(suggestions[activeSuggestion]);
+    } else if (e.key === "Escape") {
+      setShowSuggestions(false);
+    }
+  }
+
+  const displayed =
+    sort === "open247"
+      ? printers.filter((p) => p.hours === "Open Now")
+      : [...printers].sort((a, b) => a.distance - b.distance);
+
   return (
     <PageContainer>
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 20, flexWrap: "wrap" }}>
 
-      {/* Search bar */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
-        <div style={{
-          display: "flex", alignItems: "center", gap: 8, flex: 1,
-          padding: "10px 16px", borderRadius: 12,
-          background: "#ffffff", border: "1px solid rgba(190,155,70,0.22)",
-          boxShadow: "0 1px 4px rgba(0,0,0,0.05)",
-        }}>
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#9a8a60" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-          </svg>
-          <span style={{ fontSize: 13, color: "#b0a070" }}>Search printers near you…</span>
+        <div ref={wrapperRef} style={{ position: "relative", flex: 1, minWidth: 200 }}>
+          <div style={{ ...searchBarStyle, borderRadius: showSuggestions ? "12px 12px 0 0" : 12 }}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#9a8a60" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+            <input
+              type="text"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
+              placeholder="Search by address or neighborhood…"
+              style={{ border: "none", outline: "none", background: "transparent", fontSize: 13, color: "#1a1600", width: "100%" }}
+            />
+            {searchInput && (
+              <button
+                type="button"
+                onClick={() => { setSearchInput(""); setSuggestions([]); setShowSuggestions(false); }}
+                style={{ background: "none", border: "none", cursor: "pointer", color: "#b0a070", fontSize: 16, lineHeight: 1, padding: 0 }}
+              >
+                ×
+              </button>
+            )}
+          </div>
+
+          {showSuggestions && suggestions.length > 0 && (
+            <ul style={{
+              position: "absolute", top: "100%", left: 0, right: 0, zIndex: 100,
+              background: "#ffffff", border: "1px solid rgba(190,155,70,0.22)",
+              borderTop: "none", borderRadius: "0 0 12px 12px",
+              boxShadow: "0 4px 16px rgba(0,0,0,0.08)",
+              listStyle: "none", margin: 0, padding: "4px 0",
+            }}>
+              {suggestions.map((s, i) => (
+                <li
+                  key={s.placeId}
+                  onMouseDown={() => selectSuggestion(s)}
+                  onMouseEnter={() => setActiveSuggestion(i)}
+                  style={{
+                    padding: "10px 16px",
+                    cursor: "pointer",
+                    background: i === activeSuggestion ? "rgba(245,200,66,0.12)" : "transparent",
+                    borderBottom: i < suggestions.length - 1 ? "1px solid rgba(190,155,70,0.1)" : "none",
+                  }}
+                >
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "#1a1600" }}>{s.main}</div>
+                  {s.secondary && <div style={{ fontSize: 11.5, color: "#9a8a60", marginTop: 2 }}>{s.secondary}</div>}
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
-        <button style={{ padding: "10px 18px", borderRadius: 12, background: "#f5c842", color: "#1a1000", fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer", boxShadow: "0 2px 8px rgba(245,200,66,0.3)", whiteSpace: "nowrap" }}>
+
+        <button
+          type="button"
+          onClick={handleUseLocation}
+          disabled={loading}
+          style={{ ...buttonPrimary, opacity: loading ? 0.7 : 1, cursor: loading ? "not-allowed" : "pointer" }}
+        >
           📍 Use My Location
         </button>
-        <select style={{ padding: "10px 14px", borderRadius: 12, background: "#ffffff", border: "1px solid rgba(190,155,70,0.22)", color: "#5a4a20", fontSize: 13, cursor: "pointer", outline: "none" }}>
-          <option>Sort by Distance</option>
-          <option>Sort by Price</option>
-          <option>Open Now</option>
+
+        <select
+          value={sort}
+          onChange={(e) => setSort(e.target.value)}
+          style={{
+            padding: "10px 14px",
+            borderRadius: 12,
+            background: "#ffffff",
+            border: "1px solid rgba(190,155,70,0.22)",
+            color: "#5a4a20",
+            fontSize: 13,
+            cursor: "pointer",
+            outline: "none",
+          }}
+        >
+          <option value="distance">Sort by Distance</option>
+          <option value="open247">Open Now Only</option>
         </select>
       </div>
 
-      {/* Printer list */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-        {printers.map((p, i) => (
-          <div
-            key={i}
-            className={`anim-fade-up d${Math.min(i + 1, 7)}`}
-            style={{
-              display: "flex", gap: 18, padding: "20px 22px",
-              background: "#ffffff",
-              border: "1px solid rgba(190,155,70,0.18)",
-              borderRadius: 16,
-              boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
-            }}
-          >
-            {/* Icon */}
-            <div style={{ width: 52, height: 52, borderRadius: 14, background: "rgba(245,200,66,0.12)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, flexShrink: 0 }}>
-              {p.emoji}
-            </div>
+      {loading && (
+        <div style={{ textAlign: "center", padding: "60px 0", color: "#9a8a60", fontSize: 14 }}>
+          <div style={{ fontSize: 36, marginBottom: 12 }}>🔍</div>
+          Finding print shops nearby…
+        </div>
+      )}
 
-            {/* Content */}
-            <div style={{ flex: 1, minWidth: 0 }}>
-              {/* Top row */}
-              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, marginBottom: 8 }}>
-                <div>
-                  <h3 style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 15.5, fontWeight: 700, color: "#1a1600", letterSpacing: "-0.3px" }}>
-                    {p.name}
-                  </h3>
-                  <p style={{ fontSize: 12, color: "#9a8a60", marginTop: 3 }}>📍 {p.address}</p>
+      {error && !loading && (
+        <div style={{ textAlign: "center", padding: "40px 0", color: "#dc2626", fontSize: 14 }}>
+          {error}
+        </div>
+      )}
+
+      {!hasFetched && !loading && (
+        <div style={{ textAlign: "center", padding: "80px 0", color: "#b0a070", fontSize: 14 }}>
+          <div style={{ fontSize: 48, marginBottom: 14 }}>🖨️</div>
+          <p style={{ fontWeight: 700, color: "#5a4a20", fontSize: 16, marginBottom: 6 }}>
+            Find print shops near you
+          </p>
+          <p>Use your location or search by address to get started.</p>
+        </div>
+      )}
+
+      {locationLabel && !loading && printers.length > 0 && (
+        <p style={{ fontSize: 12, color: "#9a8a60", marginBottom: 14 }}>
+          Showing <strong>{displayed.length}</strong> print shop{displayed.length !== 1 ? "s" : ""} near{" "}
+          <strong>{locationLabel}</strong>
+        </p>
+      )}
+
+      {!loading && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          {displayed.map((p, i) => {
+            const chain = CHAIN_PRICES.find((c) => c.match.test(p.name));
+            const level = p.priceLevel ? PRICE_LEVEL_LABEL[p.priceLevel] : null;
+            return (
+              <div key={p.id} className={`anim-fade-up d${Math.min(i + 1, 7)}`} style={cardStyle}>
+                <div style={{
+                  width: 52, height: 52, borderRadius: 14,
+                  background: "rgba(245,200,66,0.12)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: 24, flexShrink: 0,
+                }}>
+                  {getEmoji(p.name)}
                 </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-                  <span style={{
-                    fontSize: 11.5, fontWeight: 600, padding: "3px 10px", borderRadius: 99,
-                    background: p.open ? "#dcfce7" : "#f3f0ea",
-                    color: p.open ? "#15803d" : "#6b7280",
-                  }}>
-                    {p.open ? "● Open Now" : "● Closed"}
-                  </span>
-                  <span style={{ fontSize: 13, fontWeight: 700, padding: "3px 12px", borderRadius: 10, background: "rgba(245,200,66,0.15)", color: "#92400e" }}>
-                    {p.distance}
-                  </span>
+
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, marginBottom: 8 }}>
+                    <div>
+                      <h3 style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 15.5, fontWeight: 700, color: "#1a1600", letterSpacing: "-0.3px" }}>
+                        {p.name}
+                      </h3>
+                      <p style={{ fontSize: 12, color: "#9a8a60", marginTop: 3 }}>📍 {p.address}</p>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                      <span style={{
+                        fontSize: 11.5, fontWeight: 600, padding: "3px 10px", borderRadius: 99,
+                        background: p.hours === "Open Now" ? "#dcfce7" : p.hours === "Closed Now" ? "#fef2f2" : "#f3f0ea",
+                        color: p.hours === "Open Now" ? "#15803d" : p.hours === "Closed Now" ? "#dc2626" : "#6b7280",
+                      }}>
+                        ● {p.hours}
+                      </span>
+                      <span style={{ fontSize: 13, fontWeight: 700, padding: "3px 12px", borderRadius: 10, background: "rgba(245,200,66,0.15)", color: "#92400e" }}>
+                        {p.distance.toFixed(1)} mi
+                      </span>
+                    </div>
+                  </div>
+
+                  {chain && (
+                    <div style={{ marginBottom: 10 }}>
+                      <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#b0a070", marginBottom: 3 }}>Pricing</p>
+                      <p style={{ fontSize: 12, color: "#5a4a20" }}>{chain.bw} · {chain.color}</p>
+                    </div>
+                  )}
+                  {!chain && level && (
+                    <div style={{ marginBottom: 10 }}>
+                      <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#b0a070", marginBottom: 3 }}>Price Range</p>
+                      <span style={{ fontSize: 12, fontWeight: 700, padding: "2px 10px", borderRadius: 8, background: level.bg, color: level.color }}>
+                        {level.label}
+                      </span>
+                    </div>
+                  )}
+
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                    {p.tags.map((tag) => (
+                      <span key={tag} style={tagStyle}>{tag}</span>
+                    ))}
+                    <div style={{ flex: 1 }} />
+                    <a
+                      href={`https://www.google.com/maps/place/?q=place_id:${p.id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ ...buttonPrimary, textDecoration: "none" }}
+                    >
+                      View on Maps →
+                    </a>
+                  </div>
                 </div>
               </div>
-
-              {/* Hours + price */}
-              <div style={{ display: "flex", gap: 32, marginBottom: 8 }}>
-                <div>
-                  <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#b0a070", marginBottom: 3 }}>Hours</p>
-                  <p style={{ fontSize: 12, color: "#5a4a20" }}>{p.hours}</p>
-                </div>
-                <div>
-                  <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#b0a070", marginBottom: 3 }}>Pricing</p>
-                  <p style={{ fontSize: 12, color: "#5a4a20" }}>{p.price}</p>
-                </div>
-              </div>
-
-              {/* Notes */}
-              <p style={{ fontSize: 12, color: "#9a8a60", marginBottom: 12 }}>💡 {p.notes}</p>
-
-              {/* Tags + button */}
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                {p.tags.map((tag) => (
-                  <span key={tag} style={{ fontSize: 11.5, fontWeight: 500, padding: "3px 10px", borderRadius: 8, background: "#fdf8ec", border: "1px solid rgba(190,155,70,0.22)", color: "#7a6a40" }}>
-                    {tag}
-                  </span>
-                ))}
-                <div style={{ flex: 1 }} />
-                <button style={{ fontSize: 12.5, fontWeight: 600, padding: "7px 16px", borderRadius: 10, background: "#f5c842", color: "#1a1000", border: "none", cursor: "pointer", boxShadow: "0 2px 6px rgba(245,200,66,0.3)" }}>
-                  Get Directions →
-                </button>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-
+            );
+          })}
+        </div>
+      )}
     </PageContainer>
   );
 }
