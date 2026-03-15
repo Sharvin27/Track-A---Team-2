@@ -197,7 +197,7 @@ export default function GuidePage() {
           <p style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 16, fontWeight: 700, color: "#f5c842", marginBottom: 4 }}>Ready to get started?</p>
           <p style={{ fontSize: 12.5, color: "rgba(237,218,170,0.5)" }}>Download your flyers and find a printer near you.</p>
         </div>
-        <Link href="/onboarding" style={{ padding: "11px 24px", borderRadius: 12, background: "#f5c842", color: "#1a1000", fontSize: 13, fontWeight: 700, textDecoration: "none", whiteSpace: "nowrap" }}>
+        <Link href="/getstarted" style={{ padding: "11px 24px", borderRadius: 12, background: "#f5c842", color: "#1a1000", fontSize: 13, fontWeight: 700, textDecoration: "none", whiteSpace: "nowrap" }}>
           🚀 Let&rsquo;s Go
         </Link>
       </div>

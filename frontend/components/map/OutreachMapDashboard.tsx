@@ -521,8 +521,8 @@ export default function OutreachMapDashboard() {
     <div
       style={{
         position: "relative",
-        height: "calc(100vh - 64px)",
-        minHeight: 720,
+        height: "100%",
+        minHeight: 640,
         overflow: "hidden",
         background: "#dbe7dd",
       }}
