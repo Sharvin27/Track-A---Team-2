@@ -7,6 +7,9 @@ const authRoutes = require("./routes/authRoutes");
 const leaderboardRoutes = require("./routes/leaderboardRoutes");
 const activityRoutes = require("./routes/activityRoutes");
 const badgesRoutes = require("./routes/badgesRoutes");
+const communityRoutes = require("./routes/communityRoutes");
+const meetupRoutes = require("./routes/meetupRoutes");
+const messageRoutes = require("./routes/messageRoutes");
 
 const app = express();
 
@@ -24,5 +27,8 @@ app.use("/api/auth", authRoutes);
 app.use("/api/leaderboard", leaderboardRoutes);
 app.use("/api/activity", activityRoutes);
 app.use("/api/badges", badgesRoutes);
+app.use("/api/community", communityRoutes);
+app.use("/api/meetups", meetupRoutes);
+app.use("/api/messages", messageRoutes);
 
 module.exports = app;

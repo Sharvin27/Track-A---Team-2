@@ -1,5 +1,12 @@
+const fs = require("fs");
+const path = require("path");
 const { Pool } = require("pg");
 let pool;
+
+const communitySchemaPath = path.resolve(
+  __dirname,
+  "../../sql/community_meetups_chat.sql",
+);
 
 function getConnectionString() {
   return process.env.DATABASE_URL;
@@ -187,6 +194,10 @@ async function initDb() {
       CREATE INDEX IF NOT EXISTS idx_hotspot_locations_region_code ON hotspot_locations (region_code);
       CREATE INDEX IF NOT EXISTS idx_need_regions_score ON need_regions (food_need_score DESC);
     `);
+
+    if (fs.existsSync(communitySchemaPath)) {
+      await client.query(fs.readFileSync(communitySchemaPath, "utf8"));
+    }
   } finally {
     client.release();
   }
