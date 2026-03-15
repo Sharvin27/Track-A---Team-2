@@ -72,6 +72,19 @@ export function startLocationWatch(
   });
 }
 
+export function requestCurrentPosition(options?: PositionOptions) {
+  if (!("geolocation" in navigator)) {
+    return Promise.reject(new Error("Geolocation is not supported by this browser."));
+  }
+
+  return new Promise<GeolocationPosition>((resolve, reject) => {
+    navigator.geolocation.getCurrentPosition(resolve, reject, {
+      ...DEFAULT_OPTIONS,
+      ...options,
+    });
+  });
+}
+
 export function stopLocationWatch(watchId: number | null) {
   if (watchId !== null && "geolocation" in navigator) {
     navigator.geolocation.clearWatch(watchId);
