@@ -248,6 +248,19 @@ export default function Sidebar() {
               {item.badge && (
                 <span style={{ fontSize: 13 }}>{item.badge}</span>
               )}
+              {item.isNew && !isActive && (
+                <span style={{
+                  fontSize: 9.5,
+                  fontWeight: 700,
+                  letterSpacing: "0.06em",
+                  padding: "2px 6px",
+                  borderRadius: 5,
+                  background: "rgba(245,200,66,0.2)",
+                  color: "#f5c842",
+                }}>
+                  NEW
+                </span>
+              )}
               {isActive && (
                 <span
                   className="pulse-dot"
