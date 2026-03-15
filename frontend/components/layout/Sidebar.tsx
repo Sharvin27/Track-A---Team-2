@@ -63,7 +63,6 @@ const NAV = [
   {
     href: "/getstarted",
     label: "Get Started",
-    isNew: true,
     icon: (
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <circle cx="12" cy="12" r="10" />
@@ -248,19 +247,6 @@ export default function Sidebar() {
               {/* Badges */}
               {item.badge && (
                 <span style={{ fontSize: 13 }}>{item.badge}</span>
-              )}
-              {item.isNew && !isActive && (
-                <span style={{
-                  fontSize: 9.5,
-                  fontWeight: 700,
-                  letterSpacing: "0.06em",
-                  padding: "2px 6px",
-                  borderRadius: 5,
-                  background: "rgba(245,200,66,0.2)",
-                  color: "#f5c842",
-                }}>
-                  NEW
-                </span>
               )}
               {isActive && (
                 <span
