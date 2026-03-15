@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { useAuth } from "@/context/AuthContext";
 
 const NAV = [
   {
@@ -28,18 +27,6 @@ const NAV = [
     ),
   },
   {
-    href: "/tracker",
-    label: "Route Tracker",
-    icon: (
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M3 6h6l2 12h10" />
-        <circle cx="7" cy="6" r="2" />
-        <circle cx="17" cy="18" r="2" />
-        <path d="M9 9l3 3 4-5" />
-      </svg>
-    ),
-  },
-  {
     href: "/profile",
     label: "Profile",
     icon: (
@@ -52,7 +39,7 @@ const NAV = [
   {
     href: "/leaderboard",
     label: "Leaderboard",
-    badge: "T",
+    badge: "🏆",
     icon: (
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <line x1="18" y1="20" x2="18" y2="10" />
@@ -73,7 +60,7 @@ const NAV = [
     ),
   },
   {
-    href: "/getstarted",
+    href: "/onboarding",
     label: "Get Started",
     isNew: true,
     icon: (
@@ -86,143 +73,104 @@ const NAV = [
   },
 ];
 
-interface SidebarProps {
-  isMobile: boolean;
-  isOpen: boolean;
-  onClose: () => void;
-}
-
-function getInitial(name: string): string {
-  if (!name?.trim()) return "?";
-  const first = name.trim()[0];
-  return first.toUpperCase();
-}
-
-export default function Sidebar({ isMobile, isOpen, onClose }: SidebarProps) {
+export default function Sidebar() {
   const pathname = usePathname();
   const [hovered, setHovered] = useState<string | null>(null);
-  const { user, logout } = useAuth();
 
   return (
     <aside
       style={{
-        width: isMobile ? 280 : 232,
+        width: 232,
         flexShrink: 0,
         height: "100%",
         display: "flex",
         flexDirection: "column",
+        // TRUE glassmorphism
         background: "rgba(15, 12, 5, 0.80)",
         backdropFilter: "blur(28px) saturate(180%)",
         WebkitBackdropFilter: "blur(28px) saturate(180%)",
         borderRight: "1px solid rgba(245, 200, 66, 0.14)",
         boxShadow: "6px 0 40px rgba(0,0,0,0.22), inset -1px 0 0 rgba(245,200,66,0.07)",
-        position: isMobile ? "fixed" : "relative",
-        top: 0,
-        left: 0,
-        zIndex: 50,
+        position: "relative",
         overflow: "hidden",
-        transform: isMobile ? `translateX(${isOpen ? "0" : "-100%"})` : "translateX(0)",
-        transition: "transform 0.25s ease",
       }}
     >
-      <div
-        style={{
-          position: "absolute",
-          top: -60,
-          left: "50%",
-          transform: "translateX(-50%)",
-          width: 200,
-          height: 200,
-          background: "radial-gradient(circle, rgba(245,200,66,0.18) 0%, transparent 70%)",
-          pointerEvents: "none",
-        }}
-      />
-      <div
-        style={{
-          position: "absolute",
-          bottom: -40,
-          right: -40,
-          width: 160,
-          height: 160,
-          background: "radial-gradient(circle, rgba(245,200,66,0.07) 0%, transparent 70%)",
-          pointerEvents: "none",
-        }}
-      />
+      {/* Top ambient glow */}
+      <div style={{
+        position: "absolute",
+        top: -60,
+        left: "50%",
+        transform: "translateX(-50%)",
+        width: 200,
+        height: 200,
+        background: "radial-gradient(circle, rgba(245,200,66,0.18) 0%, transparent 70%)",
+        pointerEvents: "none",
+      }} />
 
-      <div style={{ padding: "20px 20px 18px", position: "relative", zIndex: 1 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <div
-              style={{
-                width: 38,
-                height: 38,
-                borderRadius: 12,
-                background: "linear-gradient(135deg, #f5c842 0%, #e8a200 100%)",
-                boxShadow: "0 3px 14px rgba(245,200,66,0.45)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: 19,
-                flexShrink: 0,
-              }}
-            >
-              L
+      {/* Bottom ambient glow */}
+      <div style={{
+        position: "absolute",
+        bottom: -40,
+        right: -40,
+        width: 160,
+        height: 160,
+        background: "radial-gradient(circle, rgba(245,200,66,0.07) 0%, transparent 70%)",
+        pointerEvents: "none",
+      }} />
+
+      {/* ── Logo ── */}
+      <div style={{ padding: "24px 20px 18px", position: "relative", zIndex: 1 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{
+            width: 38,
+            height: 38,
+            borderRadius: 12,
+            background: "linear-gradient(135deg, #f5c842 0%, #e8a200 100%)",
+            boxShadow: "0 3px 14px rgba(245,200,66,0.45)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 19,
+            flexShrink: 0,
+          }}>
+            🍋
+          </div>
+          <div>
+            <div style={{
+              fontFamily: "'Fraunces', Georgia, serif",
+              fontWeight: 600,
+              fontSize: 15.5,
+              color: "#ede5cc",
+              lineHeight: 1.1,
+              letterSpacing: "-0.3px",
+            }}>
+              Lemontree
             </div>
-            <div>
-              <div
-                style={{
-                  fontFamily: "'Fraunces', Georgia, serif",
-                  fontWeight: 600,
-                  fontSize: 15.5,
-                  color: "#ede5cc",
-                  lineHeight: 1.1,
-                  letterSpacing: "-0.3px",
-                }}
-              >
-                Lemontree
-              </div>
-              <div style={{ fontSize: 11, color: "rgba(237,229,204,0.45)", marginTop: 2 }}>
-                Volunteer Hub
-              </div>
+            <div style={{ fontSize: 11, color: "rgba(237,229,204,0.45)", marginTop: 2 }}>
+              Volunteer Hub
             </div>
           </div>
-          {isMobile ? (
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="Close navigation"
-              style={{
-                width: 34,
-                height: 34,
-                borderRadius: 10,
-                border: "1px solid rgba(245,200,66,0.18)",
-                background: "rgba(255,255,255,0.04)",
-                color: "#ede5cc",
-              }}
-            >
-              X
-            </button>
-          ) : null}
         </div>
       </div>
 
+      {/* Divider */}
       <div style={{ height: 1, background: "rgba(245,200,66,0.12)", margin: "0 16px 16px" }} />
 
-      <div
-        style={{
-          fontSize: 10,
-          fontWeight: 600,
-          letterSpacing: "0.12em",
-          textTransform: "uppercase",
-          color: "rgba(237,229,204,0.35)",
-          padding: "0 20px 10px",
-          position: "relative",
-          zIndex: 1,
-        }}
-      >
+      {/* Section label */}
+      <div style={{
+        fontSize: 10,
+        fontWeight: 600,
+        letterSpacing: "0.12em",
+        textTransform: "uppercase",
+        color: "rgba(237,229,204,0.35)",
+        padding: "0 20px 10px",
+        position: "relative",
+        zIndex: 1,
+      }}>
         Navigation
       </div>
 
+      {/* ── Nav Items ── */}
       <nav style={{ flex: 1, padding: "0 10px", overflowY: "auto", position: "relative", zIndex: 1 }}>
         {NAV.map((item) => {
           const isActive = pathname === item.href;
@@ -232,11 +180,6 @@ export default function Sidebar({ isMobile, isOpen, onClose }: SidebarProps) {
             <Link
               key={item.href}
               href={item.href}
-              onClick={() => {
-                if (isMobile) {
-                  onClose();
-                }
-              }}
               onMouseEnter={() => setHovered(item.href)}
               onMouseLeave={() => setHovered(null)}
               style={{
@@ -251,69 +194,67 @@ export default function Sidebar({ isMobile, isOpen, onClose }: SidebarProps) {
                 background: isActive
                   ? "rgba(245,200,66,0.16)"
                   : isHov
-                    ? "rgba(245,200,66,0.08)"
-                    : "transparent",
+                  ? "rgba(245,200,66,0.08)"
+                  : "transparent",
                 transition: "background 0.18s ease",
                 overflow: "hidden",
               }}
             >
-              {isActive ? (
-                <span
-                  style={{
-                    position: "absolute",
-                    left: 0,
-                    top: "50%",
-                    transform: "translateY(-50%)",
-                    width: 3,
-                    height: "55%",
-                    borderRadius: "0 3px 3px 0",
-                    background: "#f5c842",
-                    boxShadow: "2px 0 10px rgba(245,200,66,0.7)",
-                  }}
-                />
-              ) : null}
+              {/* Active left bar */}
+              {isActive && (
+                <span style={{
+                  position: "absolute",
+                  left: 0,
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  width: 3,
+                  height: "55%",
+                  borderRadius: "0 3px 3px 0",
+                  background: "#f5c842",
+                  boxShadow: "2px 0 10px rgba(245,200,66,0.7)",
+                }} />
+              )}
 
-              <span
-                style={{
-                  color: isActive ? "#f5c842" : isHov ? "rgba(237,229,204,0.9)" : "rgba(237,229,204,0.45)",
-                  transition: "color 0.15s",
-                  flexShrink: 0,
-                  display: "flex",
-                }}
-              >
+              {/* Icon */}
+              <span style={{
+                color: isActive ? "#f5c842" : isHov ? "rgba(237,229,204,0.9)" : "rgba(237,229,204,0.45)",
+                transition: "color 0.15s",
+                flexShrink: 0,
+                display: "flex",
+              }}>
                 {item.icon}
               </span>
 
-              <span
-                style={{
-                  fontSize: 13.5,
-                  fontWeight: isActive ? 600 : 500,
-                  color: isActive ? "#f5c842" : isHov ? "#ede5cc" : "rgba(237,229,204,0.7)",
-                  transition: "color 0.15s",
-                  flex: 1,
-                  letterSpacing: "-0.1px",
-                }}
-              >
+              {/* Label */}
+              <span style={{
+                fontSize: 13.5,
+                fontWeight: isActive ? 600 : 500,
+                color: isActive ? "#f5c842" : isHov ? "#ede5cc" : "rgba(237,229,204,0.7)",
+                transition: "color 0.15s",
+                flex: 1,
+                letterSpacing: "-0.1px",
+              }}>
                 {item.label}
               </span>
 
-              {item.badge ? <span style={{ fontSize: 13 }}>{item.badge}</span> : null}
-              {item.isNew && !isActive ? (
-                <span
-                  style={{
-                    fontSize: 9.5,
-                    fontWeight: 700,
-                    letterSpacing: "0.06em",
-                    padding: "2px 6px",
-                    borderRadius: 5,
-                    background: "rgba(245,200,66,0.2)",
-                    color: "#f5c842",
-                  }}
-                >
+              {/* Badges */}
+              {item.badge && (
+                <span style={{ fontSize: 13 }}>{item.badge}</span>
+              )}
+              {item.isNew && !isActive && (
+                <span style={{
+                  fontSize: 9.5,
+                  fontWeight: 700,
+                  letterSpacing: "0.06em",
+                  padding: "2px 6px",
+                  borderRadius: 5,
+                  background: "rgba(245,200,66,0.2)",
+                  color: "#f5c842",
+                }}>
                   NEW
                 </span>
-              ) : null}
-              {isActive ? (
+              )}
+              {isActive && (
                 <span
                   className="pulse-dot"
                   style={{
@@ -324,17 +265,18 @@ export default function Sidebar({ isMobile, isOpen, onClose }: SidebarProps) {
                     flexShrink: 0,
                   }}
                 />
-              ) : null}
+              )}
             </Link>
           );
         })}
       </nav>
 
+      {/* Divider */}
       <div style={{ height: 1, background: "rgba(245,200,66,0.12)", margin: "10px 16px 12px" }} />
 
+      {/* ── User Footer ── */}
       <div style={{ padding: "0 10px 20px", position: "relative", zIndex: 1 }}>
-        <Link
-          href={user?.isGuest ? "/" : "/profile"}
+        <div
           style={{
             display: "flex",
             alignItems: "center",
@@ -344,80 +286,37 @@ export default function Sidebar({ isMobile, isOpen, onClose }: SidebarProps) {
             background: "rgba(255,255,255,0.04)",
             cursor: "pointer",
             transition: "background 0.18s",
-            textDecoration: "none",
-            color: "inherit",
           }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.08)"; }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.04)"; }}
         >
-          <div
-            style={{
-              width: 30,
-              height: 30,
-              borderRadius: 9,
-              background: "linear-gradient(135deg,#f5c842,#e8a200)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: 11,
-              fontWeight: 700,
-              color: "#1a1000",
-              flexShrink: 0,
-            }}
-          >
-            {user ? getInitial(user.username) : "?"}
+          <div style={{
+            width: 30,
+            height: 30,
+            borderRadius: 9,
+            background: "linear-gradient(135deg,#f5c842,#e8a200)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 11,
+            fontWeight: 700,
+            color: "#1a1000",
+            flexShrink: 0,
+          }}>
+            SG
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div
-              style={{
-                fontSize: 12.5,
-                fontWeight: 600,
-                color: "#ede5cc",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
-              }}
-            >
-              {user ? user.username : "Guest"}
+            <div style={{ fontSize: 12.5, fontWeight: 600, color: "#ede5cc", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              Sharvin Gavad
             </div>
             <div style={{ fontSize: 10.5, color: "rgba(237,229,204,0.38)", marginTop: 1 }}>
-              {user?.isGuest ? "Guest" : user ? "Volunteer" : "Log in to get started"}
+              Hackathon 2025
             </div>
           </div>
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="rgba(237,229,204,0.35)" strokeWidth="2">
             <circle cx="12" cy="5" r="1" /><circle cx="12" cy="12" r="1" /><circle cx="12" cy="19" r="1" />
           </svg>
-        </Link>
-
-        {/* Guest CTA: switch to login/signup (effectively log guest out) */}
-        {user?.isGuest && (
-          <button
-            type="button"
-            onClick={() => logout()}
-            style={{
-              width: "100%",
-              marginTop: 10,
-              padding: "10px 12px",
-              borderRadius: 11,
-              border: "1px solid rgba(245,200,66,0.25)",
-              background: "rgba(245,200,66,0.08)",
-              color: "#f5c842",
-              fontSize: 12,
-              fontWeight: 600,
-              cursor: "pointer",
-              transition: "background 0.18s, border-color 0.18s",
-              textAlign: "center",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = "rgba(245,200,66,0.14)";
-              e.currentTarget.style.borderColor = "rgba(245,200,66,0.4)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = "rgba(245,200,66,0.08)";
-              e.currentTarget.style.borderColor = "rgba(245,200,66,0.25)";
-            }}
-          >
-            Want to do more? Login or Sign up
-          </button>
-        )}
+        </div>
       </div>
     </aside>
   );

@@ -63,7 +63,7 @@ export default function PrintersPage() {
     <PageContainer>
 
       {/* Search bar */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
         <div style={{
           display: "flex", alignItems: "center", gap: 8, flex: 1,
           padding: "10px 16px", borderRadius: 12,
@@ -92,7 +92,7 @@ export default function PrintersPage() {
             key={i}
             className={`anim-fade-up d${Math.min(i + 1, 7)}`}
             style={{
-              display: "flex", gap: 18, padding: "20px 22px", flexWrap: "wrap",
+              display: "flex", gap: 18, padding: "20px 22px",
               background: "#ffffff",
               border: "1px solid rgba(190,155,70,0.18)",
               borderRadius: 16,
@@ -107,7 +107,7 @@ export default function PrintersPage() {
             {/* Content */}
             <div style={{ flex: 1, minWidth: 0 }}>
               {/* Top row */}
-              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, marginBottom: 8, flexWrap: "wrap" }}>
+              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, marginBottom: 8 }}>
                 <div>
                   <h3 style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 15.5, fontWeight: 700, color: "#1a1600", letterSpacing: "-0.3px" }}>
                     {p.name}
@@ -129,7 +129,7 @@ export default function PrintersPage() {
               </div>
 
               {/* Hours + price */}
-              <div style={{ display: "flex", gap: 20, marginBottom: 8, flexWrap: "wrap" }}>
+              <div style={{ display: "flex", gap: 32, marginBottom: 8 }}>
                 <div>
                   <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#b0a070", marginBottom: 3 }}>Hours</p>
                   <p style={{ fontSize: 12, color: "#5a4a20" }}>{p.hours}</p>
@@ -144,7 +144,7 @@ export default function PrintersPage() {
               <p style={{ fontSize: 12, color: "#9a8a60", marginBottom: 12 }}>💡 {p.notes}</p>
 
               {/* Tags + button */}
-              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 {p.tags.map((tag) => (
                   <span key={tag} style={{ fontSize: 11.5, fontWeight: 500, padding: "3px 10px", borderRadius: 8, background: "#fdf8ec", border: "1px solid rgba(190,155,70,0.22)", color: "#7a6a40" }}>
                     {tag}
