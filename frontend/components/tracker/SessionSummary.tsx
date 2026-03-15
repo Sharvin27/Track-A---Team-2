@@ -1,3 +1,4 @@
+import Image from "next/image";
 import SectionCard from "@/components/common/SectionCard";
 import { formatDistance } from "@/lib/distance";
 import { formatDuration, formatStopType } from "@/lib/session";
@@ -26,6 +27,27 @@ export default function SessionSummary({
 
   return (
     <SectionCard title="Session Summary" subtitle="Captured route details for the latest volunteer session.">
+      {session.routeImageUrl ? (
+        <div
+          style={{
+            marginBottom: 16,
+            borderRadius: 18,
+            overflow: "hidden",
+            border: "1px solid rgba(190,155,70,0.16)",
+            background: "#f7f3df",
+          }}
+        >
+          <Image
+            src={session.routeImageUrl}
+            alt="Saved route snapshot"
+            width={1200}
+            height={700}
+            unoptimized
+            style={{ display: "block", width: "100%", maxHeight: 240, objectFit: "cover" }}
+          />
+        </div>
+      ) : null}
+
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
         <SummaryItem label="Start time" value={new Date(session.startTime).toLocaleString()} />
         <SummaryItem label="End time" value={session.endTime ? new Date(session.endTime).toLocaleString() : "In progress"} />
@@ -51,7 +73,7 @@ export default function SessionSummary({
         {session.stops.length === 0 ? (
           <p style={{ fontSize: 13, color: "#8a7a50" }}>No stops were recorded for this session.</p>
         ) : (
-          <div style={{ display: "grid", gap: 8 }}>
+          <div style={{ display: "grid", gap: 8, maxHeight: 220, overflowY: "auto", paddingRight: 4 }}>
             {session.stops.map((stop) => (
               <div
                 key={stop.id}
@@ -63,11 +85,10 @@ export default function SessionSummary({
                 }}
               >
                 <p style={{ fontSize: 13, fontWeight: 600, color: "#1a1600" }}>
-                  {formatStopType(stop.type)}
-                  {stop.label ? ` · ${stop.label}` : ""}
+                  {[formatStopType(stop.type), stop.label].filter(Boolean).join(" | ")}
                 </p>
                 <p style={{ fontSize: 12, color: "#8a7a50", marginTop: 3 }}>
-                  {new Date(stop.timestamp).toLocaleTimeString()} · {stop.lat.toFixed(5)}, {stop.lng.toFixed(5)}
+                  {`${new Date(stop.timestamp).toLocaleTimeString()} | ${stop.lat.toFixed(5)}, ${stop.lng.toFixed(5)}`}
                 </p>
               </div>
             ))}

@@ -5,11 +5,36 @@ const { pool } = require("../db");
 const SALT_ROUNDS = 12;
 const JWT_SECRET = process.env.JWT_SECRET || "change-me-in-production";
 const JWT_EXPIRES = "7d";
+const USER_SELECT = `
+  SELECT
+    users.id,
+    users.username,
+    users.email,
+    users.agreed_to_terms,
+    users.created_at,
+    profile_photos.image_url AS profile_photo_url
+  FROM users
+  LEFT JOIN profile_photos ON profile_photos.user_id = users.id
+`;
 
 function sanitizeUser(row) {
   if (!row) return null;
   const { password_hash, ...user } = row;
   return user;
+}
+
+function getTokenFromRequest(req) {
+  const authHeader = req.headers.authorization;
+  return authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
+}
+
+function verifyToken(token) {
+  return jwt.verify(token, JWT_SECRET);
+}
+
+async function fetchUserById(userId) {
+  const result = await pool.query(`${USER_SELECT} WHERE users.id = $1`, [userId]);
+  return result.rows[0] ?? null;
 }
 
 async function signup(req, res) {
@@ -29,10 +54,10 @@ async function signup(req, res) {
     const password_hash = await bcrypt.hash(password, SALT_ROUNDS);
     const result = await pool.query(
       `INSERT INTO users (username, email, password_hash) VALUES ($1, $2, $3)
-       RETURNING id, username, email, agreed_to_terms, created_at`,
+       RETURNING id`,
       [username.trim(), email.trim().toLowerCase(), password_hash]
     );
-    const user = result.rows[0];
+    const user = await fetchUserById(result.rows[0].id);
     const token = jwt.sign(
       { userId: user.id, email: user.email },
       JWT_SECRET,
@@ -56,7 +81,19 @@ async function login(req, res) {
     }
 
     const result = await pool.query(
-      "SELECT id, username, email, password_hash, agreed_to_terms, created_at FROM users WHERE email = $1",
+      `
+        SELECT
+          users.id,
+          users.username,
+          users.email,
+          users.password_hash,
+          users.agreed_to_terms,
+          users.created_at,
+          profile_photos.image_url AS profile_photo_url
+        FROM users
+        LEFT JOIN profile_photos ON profile_photos.user_id = users.id
+        WHERE users.email = $1
+      `,
       [email.trim().toLowerCase()]
     );
     const row = result.rows[0];
@@ -83,17 +120,12 @@ async function login(req, res) {
 
 async function me(req, res) {
   try {
-    const authHeader = req.headers.authorization;
-    const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
+    const token = getTokenFromRequest(req);
     if (!token) {
       return res.status(401).json({ error: "Not authenticated." });
     }
-    const decoded = jwt.verify(token, JWT_SECRET);
-    const result = await pool.query(
-      "SELECT id, username, email, agreed_to_terms, created_at FROM users WHERE id = $1",
-      [decoded.userId]
-    );
-    const user = result.rows[0];
+    const decoded = verifyToken(token);
+    const user = await fetchUserById(decoded.userId);
     if (!user) {
       return res.status(401).json({ error: "User not found." });
     }
@@ -109,21 +141,17 @@ async function me(req, res) {
 
 async function agreeToTerms(req, res) {
   try {
-    const authHeader = req.headers.authorization;
-    const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
+    const token = getTokenFromRequest(req);
     if (!token) {
       return res.status(401).json({ error: "Not authenticated." });
     }
-    const decoded = jwt.verify(token, JWT_SECRET);
+    const decoded = verifyToken(token);
     await pool.query(
-      "UPDATE users SET agreed_to_terms = TRUE WHERE id = $1 RETURNING id, username, email, agreed_to_terms, created_at",
+      "UPDATE users SET agreed_to_terms = TRUE WHERE id = $1 RETURNING id",
       [decoded.userId]
     );
-    const result = await pool.query(
-      "SELECT id, username, email, agreed_to_terms, created_at FROM users WHERE id = $1",
-      [decoded.userId]
-    );
-    return res.json({ user: result.rows[0] });
+    const user = await fetchUserById(decoded.userId);
+    return res.json({ user });
   } catch (err) {
     if (err.name === "JsonWebTokenError" || err.name === "TokenExpiredError") {
       return res.status(401).json({ error: "Invalid or expired token." });
@@ -133,4 +161,38 @@ async function agreeToTerms(req, res) {
   }
 }
 
-module.exports = { signup, login, me, agreeToTerms };
+async function uploadProfilePhoto(req, res) {
+  try {
+    const token = getTokenFromRequest(req);
+    if (!token) {
+      return res.status(401).json({ error: "Not authenticated." });
+    }
+
+    const { imageUrl } = req.body;
+    if (!imageUrl?.trim()) {
+      return res.status(400).json({ error: "imageUrl is required." });
+    }
+
+    const decoded = verifyToken(token);
+    await pool.query(
+      `
+        INSERT INTO profile_photos (user_id, image_url)
+        VALUES ($1, $2)
+        ON CONFLICT (user_id)
+        DO UPDATE SET image_url = EXCLUDED.image_url, updated_at = NOW()
+      `,
+      [decoded.userId, imageUrl.trim()]
+    );
+
+    const user = await fetchUserById(decoded.userId);
+    return res.json({ user });
+  } catch (err) {
+    if (err.name === "JsonWebTokenError" || err.name === "TokenExpiredError") {
+      return res.status(401).json({ error: "Invalid or expired token." });
+    }
+    console.error("Upload profile photo error:", err);
+    return res.status(500).json({ error: "Failed to upload profile photo." });
+  }
+}
+
+module.exports = { signup, login, me, agreeToTerms, uploadProfilePhoto };

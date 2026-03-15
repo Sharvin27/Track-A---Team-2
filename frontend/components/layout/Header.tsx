@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
@@ -179,9 +180,23 @@ export default function Header({ isMobile, onToggleSidebar }: HeaderProps) {
               color: "#1a1000",
               boxShadow: "0 2px 10px rgba(245,200,66,0.35)",
               textDecoration: "none",
+              overflow: "hidden",
             }}
           >
-            {user ? getInitial(user.username) : "?"}
+            {user?.profile_photo_url ? (
+              <Image
+                src={user.profile_photo_url}
+                alt={user.username}
+                width={36}
+                height={36}
+                unoptimized
+                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+              />
+            ) : user ? (
+              getInitial(user.username)
+            ) : (
+              "?"
+            )}
           </div>
         </Link>
       </div>

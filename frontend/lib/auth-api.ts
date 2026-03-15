@@ -9,6 +9,7 @@ export type User = {
   email: string;
   agreed_to_terms: boolean;
   created_at: string;
+  profile_photo_url?: string | null;
   isGuest?: boolean;
 };
 
@@ -57,5 +58,19 @@ export async function agreeToTerms(token: string): Promise<{ user: User }> {
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || "Failed to update");
+  return data;
+}
+
+export async function uploadProfilePhoto(token: string, imageUrl: string): Promise<{ user: User }> {
+  const res = await fetch(`${API_BASE}/api/auth/profile-photo`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ imageUrl }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Failed to upload profile photo");
   return data;
 }

@@ -25,13 +25,18 @@ export interface SessionStop {
 
 export interface VolunteerSession {
   id: string;
+  userId?: number;
   startTime: string;
   endTime: string | null;
   status: SessionStatus;
   routePoints: RoutePoint[];
   stops: SessionStop[];
   totalDistanceMeters: number;
+  totalDistanceMiles?: number;
   durationSeconds: number;
+  routeImageUrl?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface SessionApiResponse {
