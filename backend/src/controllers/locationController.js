@@ -20,23 +20,31 @@ const NYC_IMPORT_REGIONS = [
   { name: "South Staten Island", lat: 40.5512, lng: -74.1728, radiusMiles: 2.5 },
 ];
 
-const getAllLocations = (req, res) => {
-  const lat = parseOptionalFloat(req.query.lat);
-  const lng = parseOptionalFloat(req.query.lng);
-  const radiusMiles = parseOptionalFloat(req.query.radiusMiles);
-  const limit = parseOptionalFloat(req.query.limit);
-  const locations = getStoredHotspotsWithPlacementSummary({
-    lat,
-    lng,
-    radiusMiles,
-    limit,
-  });
+const getAllLocations = async (req, res) => {
+  try {
+    const lat = parseOptionalFloat(req.query.lat);
+    const lng = parseOptionalFloat(req.query.lng);
+    const radiusMiles = parseOptionalFloat(req.query.radiusMiles);
+    const limit = parseOptionalFloat(req.query.limit);
 
-  res.status(200).json({
-    success: true,
-    count: locations.length,
-    data: locations,
-  });
+    const locations = await getStoredHotspotsWithPlacementSummary({
+      lat,
+      lng,
+      radiusMiles,
+      limit,
+    });
+
+    res.status(200).json({
+      success: true,
+      count: locations.length,
+      data: locations,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
 };
 
 const importOsmLocations = async (req, res) => {
@@ -111,21 +119,28 @@ const importNycLocations = async (req, res) => {
   }
 };
 
-const updateLocation = (req, res) => {
-  const updated = updateHotspotStatus(req.params.id, req.body || {});
+const updateLocation = async (req, res) => {
+  try {
+    const updated = await updateHotspotStatus(req.params.id, req.body || {});
 
-  if (!updated) {
-    res.status(404).json({
-      success: false,
-      message: "Location not found",
+    if (!updated) {
+      res.status(404).json({
+        success: false,
+        message: "Location not found",
+      });
+      return;
+    }
+
+    res.status(200).json({
+      success: true,
+      data: updated,
     });
-    return;
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
   }
-
-  res.status(200).json({
-    success: true,
-    data: updated,
-  });
 };
 
 module.exports = {

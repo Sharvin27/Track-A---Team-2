@@ -288,9 +288,6 @@ export default function ChatbotWidget() {
               }}>
                 Citrus
               </div>
-              <div style={{ fontSize: 11, color: "rgba(237,229,204,0.5)", marginTop: 2 }}>
-                Powered by Gemini AI
-              </div>
             </div>
             <button
               onClick={() => setOpen(false)}

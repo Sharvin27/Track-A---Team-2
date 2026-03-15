@@ -32,7 +32,7 @@ export default function TrackerControls({
 
   return (
     <div style={{ display: "grid", gap: 16 }}>
-      <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 10 }}>
         <button
           type="button"
           onClick={onStart}
@@ -53,38 +53,47 @@ export default function TrackerControls({
 
       <div
         style={{
-          borderRadius: 16,
-          padding: 16,
-          border: "1px solid rgba(190,155,70,0.18)",
-          background: isTracking ? "#fffdf5" : "rgba(255,255,255,0.55)",
+          borderRadius: 24,
+          padding: 18,
+          border: "1px solid rgba(190,155,70,0.14)",
+          background: isTracking
+            ? "linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(253,248,236,0.96) 100%)"
+            : "rgba(255,255,255,0.88)",
+          boxShadow: "0 10px 28px rgba(190,155,70,0.07)",
           display: "grid",
           gap: 12,
         }}
       >
         <div>
-          <p style={{ fontSize: 13, fontWeight: 600, color: "#1a1600" }}>Add Stop</p>
-          <p style={{ fontSize: 12, color: "#8a7a50", marginTop: 2 }}>
-            Mark outreach stops while the session is running.
+          <p style={{ fontSize: 13, fontWeight: 700, color: "#1a1600", letterSpacing: "0.04em", textTransform: "uppercase" }}>
+            Mark Stop
+          </p>
+          <p style={{ fontSize: 12.5, color: "#8a7a50", marginTop: 4 }}>
+            Choose a stop type, add an optional label, then pin it to your latest position.
           </p>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 10 }}>
-          <select
-            value={stopType}
-            onChange={(event) => setStopType(event.target.value as StopType)}
-            disabled={!isTracking || disabled}
-            style={fieldStyle}
-          >
-            {STOP_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {STOP_OPTIONS.map((option) => {
+            const selected = stopType === option.value;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => setStopType(option.value)}
+                disabled={!isTracking || disabled}
+                style={stopChip(selected, !isTracking || disabled)}
+              >
                 {option.label}
-              </option>
-            ))}
-          </select>
+              </button>
+            );
+          })}
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 }}>
           <input
             value={label}
             onChange={(event) => setLabel(event.target.value)}
             disabled={!isTracking || disabled}
-            placeholder="Optional label"
+            placeholder="Optional label, e.g. FedEx Office"
             style={fieldStyle}
           />
           <button
@@ -106,46 +115,72 @@ export default function TrackerControls({
 
 const fieldStyle: React.CSSProperties = {
   width: "100%",
-  padding: "11px 12px",
-  borderRadius: 12,
-  border: "1px solid rgba(190,155,70,0.22)",
+  minHeight: 48,
+  padding: "12px 14px",
+  borderRadius: 16,
+  border: "1px solid rgba(190,155,70,0.2)",
   background: "#ffffff",
-  fontSize: 13,
+  fontSize: 14,
   color: "#1a1600",
 };
 
 function primaryButton(disabled: boolean): React.CSSProperties {
   return {
-    padding: "12px 18px",
-    borderRadius: 12,
-    background: disabled ? "rgba(245,200,66,0.35)" : "#f5c842",
+    minHeight: 56,
+    padding: "14px 18px",
+    borderRadius: 999,
+    border: "none",
+    background: disabled ? "rgba(245,200,66,0.32)" : "#f5c842",
     color: "#1a1000",
     fontWeight: 700,
-    fontSize: 13,
+    fontSize: 14,
+    boxShadow: disabled ? "none" : "0 10px 22px rgba(245,200,66,0.24)",
     opacity: disabled ? 0.75 : 1,
   };
 }
 
 function secondaryButton(disabled: boolean): React.CSSProperties {
   return {
-    padding: "12px 18px",
-    borderRadius: 12,
-    background: disabled ? "rgba(26,18,0,0.1)" : "#1a1200",
-    color: disabled ? "#7a6a40" : "#f8e4a6",
+    minHeight: 56,
+    padding: "14px 18px",
+    borderRadius: 999,
+    border: "1px solid rgba(190,155,70,0.14)",
+    background: disabled ? "rgba(26,18,0,0.08)" : "#f5f3ee",
+    color: disabled ? "#a19678" : "#7a6a40",
     fontWeight: 700,
-    fontSize: 13,
+    fontSize: 14,
     opacity: disabled ? 0.6 : 1,
   };
 }
 
 function tertiaryButton(disabled: boolean): React.CSSProperties {
   return {
-    padding: "11px 16px",
-    borderRadius: 12,
-    background: disabled ? "rgba(21,128,61,0.18)" : "#15803d",
-    color: disabled ? "#4b5563" : "#f0fdf4",
+    minWidth: 112,
+    minHeight: 48,
+    padding: "12px 18px",
+    borderRadius: 16,
+    border: "none",
+    background: disabled ? "rgba(223,233,225,0.75)" : "#e8f1ea",
+    color: disabled ? "#8f9a92" : "#697567",
     fontWeight: 700,
-    fontSize: 13,
+    fontSize: 14,
     opacity: disabled ? 0.65 : 1,
+  };
+}
+
+function stopChip(selected: boolean, disabled: boolean): React.CSSProperties {
+  return {
+    minHeight: 40,
+    padding: "9px 14px",
+    borderRadius: 999,
+    border: selected ? "1px solid rgba(245,200,66,0.38)" : "1px solid rgba(190,155,70,0.18)",
+    background: disabled
+      ? "rgba(245,243,238,0.72)"
+      : selected
+        ? "rgba(245,200,66,0.16)"
+        : "#ffffff",
+    color: disabled ? "#b0a487" : selected ? "#8f6d10" : "#5a4a20",
+    fontSize: 13,
+    fontWeight: 600,
   };
 }

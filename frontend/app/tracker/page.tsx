@@ -1,16 +1,19 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import SectionCard from "@/components/common/SectionCard";
 import StatCard from "@/components/common/StatCard";
 import PageContainer from "@/components/layout/PageContainer";
 import SessionSummary from "@/components/tracker/SessionSummary";
+import SessionShareModal from "@/components/tracker/SessionShareModal";
 import TrackerControls from "@/components/tracker/TrackerControls";
 import TrackerMap from "@/components/tracker/TrackerMap";
+import { useAuth } from "@/context/AuthContext";
 import { calculateRouteDistanceMeters, formatDistance } from "@/lib/distance";
 import {
   createRoutePoint,
   getGeolocationErrorMessage,
+  requestCurrentPosition,
   shouldAppendRoutePoint,
   startLocationWatch,
   stopLocationWatch,
@@ -29,10 +32,17 @@ import type {
 } from "@/types/tracker";
 
 const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ?? "http://localhost:5001";
+  (
+    process.env.NEXT_PUBLIC_API_BASE_URL ||
+    process.env.NEXT_PUBLIC_API_URL ||
+    "http://localhost:5001"
+  ).replace(/\/$/, "");
 
 export default function TrackerPage() {
+  const { token } = useAuth();
   const watchIdRef = useRef<number | null>(null);
+  const captureSnapshotRef = useRef<(() => Promise<string | null>) | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
   const [activeSession, setActiveSession] = useState<VolunteerSession | null>(null);
   const [lastCompletedSession, setLastCompletedSession] = useState<VolunteerSession | null>(null);
   const [currentPoint, setCurrentPoint] = useState<RoutePoint | null>(null);
@@ -40,16 +50,34 @@ export default function TrackerPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [isShareOpen, setIsShareOpen] = useState(false);
 
   const isTracking = activeSession?.status === "tracking";
   const summarySession = activeSession ?? lastCompletedSession;
   const displayedRoutePoints = activeSession?.routePoints ?? lastCompletedSession?.routePoints ?? [];
   const displayedStops = activeSession?.stops ?? lastCompletedSession?.stops ?? [];
+  const handleSnapshotReady = useCallback((capture: (() => Promise<string | null>) | null) => {
+    captureSnapshotRef.current = capture;
+  }, []);
 
   useEffect(() => {
     return () => {
       stopLocationWatch(watchIdRef.current);
     };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const mediaQuery = window.matchMedia("(max-width: 768px)");
+    const updateViewport = () => setIsMobile(mediaQuery.matches);
+
+    updateViewport();
+    mediaQuery.addEventListener("change", updateViewport);
+
+    return () => mediaQuery.removeEventListener("change", updateViewport);
   }, []);
 
   const liveStats = useMemo(() => {
@@ -107,7 +135,7 @@ export default function TrackerPage() {
     setStatusMessage("Tracking did not start.");
   }
 
-  function handleStartSession() {
+  async function handleStartSession() {
     if (isTracking) {
       return;
     }
@@ -115,6 +143,7 @@ export default function TrackerPage() {
     setErrorMessage(null);
     setSaveState("idle");
     setSaveError(null);
+    setIsShareOpen(false);
     setStatusMessage("Requesting location permission...");
     setLastCompletedSession(null);
     setCurrentPoint(null);
@@ -122,6 +151,24 @@ export default function TrackerPage() {
 
     try {
       watchIdRef.current = startLocationWatch(handlePosition, handlePositionError);
+      setStatusMessage("Locating your position...");
+
+      requestCurrentPosition()
+        .then((position) => {
+          handlePosition(position);
+        })
+        .catch((error: GeolocationPositionError | Error) => {
+          if (error && "code" in error) {
+            setStatusMessage(
+              error.code === error.TIMEOUT
+                ? "Waiting for a stronger GPS fix..."
+                : "Location permission granted. Waiting for live update..."
+            );
+            return;
+          }
+
+          setStatusMessage("Location permission granted. Waiting for live update...");
+        });
     } catch (error) {
       setActiveSession(null);
       setCurrentPoint(null);
@@ -142,32 +189,49 @@ export default function TrackerPage() {
     watchIdRef.current = null;
 
     const completed = completeSession(activeSession);
+    const routeImageUrl = (await captureSnapshotRef.current?.()) ?? undefined;
+    const completedSession = routeImageUrl ? { ...completed, routeImageUrl } : completed;
     setActiveSession(null);
-    setLastCompletedSession(completed);
+    setLastCompletedSession(completedSession);
+    setIsShareOpen(true);
     setStatusMessage("Session stopped. Summary ready.");
 
     try {
       setSaveState("saving");
       setSaveError(null);
 
+      if (!token) {
+        throw new Error("Login is required to save a completed session.");
+      }
+
       const response = await fetch(`${API_BASE_URL}/api/sessions`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(completed),
+        body: JSON.stringify(completedSession),
       });
 
       if (!response.ok) {
-        throw new Error(`Request failed with status ${response.status}`);
+        const errorPayload = await response.json().catch(() => null);
+        throw new Error(
+          errorPayload?.message ||
+            errorPayload?.error ||
+            `Request failed with status ${response.status}`
+        );
       }
 
       const payload = (await response.json()) as SessionApiResponse;
       setLastCompletedSession(payload.data);
       setSaveState("saved");
-    } catch {
+    } catch (error) {
       setSaveState("error");
-      setSaveError("The session was completed locally, but saving to the backend failed.");
+      setSaveError(
+        error instanceof Error
+          ? error.message
+          : "The session was completed locally, but saving to the backend failed."
+      );
     }
   }
 
@@ -192,77 +256,193 @@ export default function TrackerPage() {
   }
 
   return (
-    <PageContainer style={{ paddingBottom: 36 }}>
-      <div style={{ display: "grid", gap: 20 }}>
-        <SectionCard
-          dark
-          title="Volunteer Session Route Tracker"
-          subtitle="Use your browser location to record outreach walks, route paths, and stop markers in real time."
-          action={
-            <div
-              style={{
-                fontSize: 12,
-                color: "rgba(245,200,66,0.72)",
-                maxWidth: 240,
-                textAlign: "right",
-              }}
-            >
-              Browser geolocation + Mapbox GL + Express session storage
-            </div>
-          }
-        >
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 14 }}>
-            <StatCard label="Status" value={isTracking ? "Tracking" : "Idle"} icon="P" iconBg="#fef3c7" />
-            <StatCard label="Route Points" value={liveStats.points} icon="R" iconBg="#dbeafe" />
-            <StatCard label="Distance" value={liveStats.distance} icon="D" iconBg="#dcfce7" />
-            <StatCard label="Stops" value={liveStats.stops} icon="S" iconBg="#fee2e2" />
-          </div>
-        </SectionCard>
-
+    <PageContainer
+      style={{
+        padding: isMobile ? "12px 12px 28px" : "22px 24px 40px",
+      }}
+    >
+      <div style={{ display: "grid", gap: 16, maxWidth: 980, margin: "0 auto" }}>
         <div
           style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
-            gap: 20,
+            borderRadius: 28,
+            background: "linear-gradient(180deg, #201300 0%, #2b1800 100%)",
+            padding: isMobile ? 16 : 20,
+            color: "#fff8e8",
+            boxShadow: "0 18px 44px rgba(46,27,0,0.18)",
+            border: "1px solid rgba(245,200,66,0.08)",
           }}
         >
-          <SectionCard
-            title="Live Route Map"
-            subtitle="Current location, route polyline, and stop markers update while a session is running."
-            noPadding
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 12,
+              marginBottom: 14,
+            }}
           >
-            <div style={{ padding: "0 24px 24px" }}>
-              <TrackerMap
-                routePoints={displayedRoutePoints}
-                currentPoint={currentPoint}
-                stops={displayedStops}
-              />
+            <div>
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: 12,
+                  fontWeight: 700,
+                  letterSpacing: "0.14em",
+                  textTransform: "uppercase",
+                  color: "rgba(245,200,66,0.72)",
+                }}
+              >
+                Route Tracker
+              </p>
+              <h2
+                style={{
+                  margin: "6px 0 0",
+                  fontFamily: "'Fraunces', Georgia, serif",
+                  fontSize: isMobile ? 28 : 34,
+                  lineHeight: 1.05,
+                  letterSpacing: "-0.04em",
+                  color: "#f7e3ad",
+                }}
+              >
+                Keep the map front and center while you walk.
+              </h2>
             </div>
-          </SectionCard>
+            <div
+              style={{
+                padding: "10px 14px",
+                borderRadius: 999,
+                background: isTracking ? "rgba(245,200,66,0.16)" : "rgba(255,255,255,0.08)",
+                color: isTracking ? "#f5c842" : "rgba(245,228,166,0.86)",
+                fontSize: 13,
+                fontWeight: 700,
+                minWidth: 110,
+                textAlign: "center",
+              }}
+            >
+              {isTracking ? "Live Recording" : "Ready"}
+            </div>
+          </div>
 
-          <div style={{ display: "grid", gap: 20 }}>
-            <SectionCard title="Controls" subtitle={statusMessage}>
-              <TrackerControls
-                isTracking={Boolean(isTracking)}
-                onStart={handleStartSession}
-                onStop={handleStopSession}
-                onAddStop={handleAddStop}
-                isBusy={saveState === "saving"}
-              />
-              {errorMessage ? (
-                <p style={{ marginTop: 14, fontSize: 12.5, color: "#b91c1c", lineHeight: 1.5 }}>
-                  {errorMessage}
-                </p>
-              ) : null}
-            </SectionCard>
-
-            <SessionSummary
-              session={summarySession}
-              saveState={saveState}
-              saveError={saveError}
-            />
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+              gap: 10,
+            }}
+          >
+            <StatCard label="Status" value={isTracking ? "Tracking" : "Idle"} icon="P" iconBg="#fdba74" />
+            <StatCard label="Route Points" value={liveStats.points} icon="R" iconBg="#93c5fd" />
+            <StatCard label="Distance" value={liveStats.distance} icon="D" iconBg="#86efac" />
+            <StatCard label="Stops" value={liveStats.stops} icon="S" iconBg="#fca5a5" />
           </div>
         </div>
+
+        <div style={{ display: "grid", gap: 14 }}>
+          <TrackerMap
+            routePoints={displayedRoutePoints}
+            currentPoint={currentPoint}
+            stops={displayedStops}
+            height={isMobile ? "68vh" : "72vh"}
+            onSnapshotReady={handleSnapshotReady}
+            overlay={
+              <>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                  <div
+                    style={{
+                      maxWidth: "70%",
+                      padding: "12px 14px",
+                      borderRadius: 18,
+                      background: "rgba(26,18,0,0.72)",
+                      color: "#fff8e8",
+                      backdropFilter: "blur(14px)",
+                    }}
+                  >
+                    <p style={{ margin: 0, fontSize: 12, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(245,200,66,0.76)" }}>
+                      Live Map
+                    </p>
+                    <p style={{ margin: "4px 0 0", fontSize: isMobile ? 18 : 20, fontWeight: 700, lineHeight: 1.2 }}>
+                      {statusMessage}
+                    </p>
+                  </div>
+                  <div
+                    style={{
+                      alignSelf: "flex-start",
+                      padding: "10px 12px",
+                      borderRadius: 18,
+                      background: "rgba(255,248,232,0.14)",
+                      color: "#fff1c7",
+                      backdropFilter: "blur(12px)",
+                      textAlign: "right",
+                    }}
+                  >
+                    <p style={{ margin: 0, fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "rgba(245,200,66,0.72)" }}>
+                      Distance
+                    </p>
+                    <p style={{ margin: "3px 0 0", fontSize: 18, fontWeight: 700 }}>{liveStats.distance}</p>
+                  </div>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-end" }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: 8,
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <OverlayPill label="Points" value={String(liveStats.points)} />
+                    <OverlayPill label="Stops" value={String(liveStats.stops)} />
+                    <OverlayPill label="Time" value={liveStats.duration} />
+                  </div>
+                  <div
+                    style={{
+                      padding: "10px 14px",
+                      borderRadius: 999,
+                      background: "rgba(26,18,0,0.74)",
+                      color: "#fff8e8",
+                      fontSize: 12.5,
+                      fontWeight: 700,
+                      backdropFilter: "blur(12px)",
+                    }}
+                  >
+                    {isTracking ? "Route is updating" : "Tap Start to begin"}
+                  </div>
+                </div>
+              </>
+            }
+          />
+
+          <SectionCard
+            title="Controls"
+            subtitle="Large mobile controls live under the map so the route stays visible first."
+            style={{ borderRadius: 24, alignSelf: "start" }}
+          >
+            <TrackerControls
+              isTracking={Boolean(isTracking)}
+              onStart={handleStartSession}
+              onStop={handleStopSession}
+              onAddStop={handleAddStop}
+              isBusy={saveState === "saving"}
+            />
+            {errorMessage ? (
+              <p style={{ marginTop: 14, fontSize: 12.5, color: "#b91c1c", lineHeight: 1.5 }}>
+                {errorMessage}
+              </p>
+            ) : null}
+          </SectionCard>
+        </div>
+
+        <SessionSummary
+          session={summarySession}
+          saveState={saveState}
+          saveError={saveError}
+        />
+        <SessionShareModal
+          key={`${lastCompletedSession?.id ?? "none"}-${isShareOpen ? "open" : "closed"}`}
+          isOpen={isShareOpen}
+          session={lastCompletedSession}
+          onClose={() => setIsShareOpen(false)}
+        />
 
         <SectionCard title="Tracking Notes" subtitle="MVP guardrails and behavior">
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14 }}>
@@ -282,6 +462,35 @@ export default function TrackerPage() {
         </SectionCard>
       </div>
     </PageContainer>
+  );
+}
+
+function OverlayPill({ label, value }: { label: string; value: string }) {
+  return (
+    <div
+      style={{
+        padding: "10px 12px",
+        borderRadius: 18,
+        background: "rgba(255,248,232,0.16)",
+        color: "#fff8e8",
+        backdropFilter: "blur(12px)",
+        minWidth: 82,
+      }}
+    >
+      <p
+        style={{
+          margin: 0,
+          fontSize: 11,
+          fontWeight: 700,
+          letterSpacing: "0.08em",
+          textTransform: "uppercase",
+          color: "rgba(245,200,66,0.72)",
+        }}
+      >
+        {label}
+      </p>
+      <p style={{ margin: "4px 0 0", fontSize: 16, fontWeight: 700 }}>{value}</p>
+    </div>
   );
 }
 

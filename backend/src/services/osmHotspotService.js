@@ -1,9 +1,8 @@
-const db = require("../db/database");
-const { findNeedRegionForPoint } = require("./needRegionService");
+const { getPool, query } = require("../db");
 const {
-  attachSummariesToHotspots,
-  getTargetSummary,
-} = require("../data/placementRepository");
+  findNeedRegionForPointInRegions,
+  getStoredNeedRegions,
+} = require("./needRegionService");
 
 const OVERPASS_ENDPOINTS = (
   process.env.OVERPASS_ENDPOINTS ||
@@ -64,7 +63,7 @@ const CATEGORY_SCORES = {
   "Place of Worship": 5.4,
 };
 
-const importHotspotStatement = db.prepare(`
+const UPSERT_HOTSPOT_SQL = `
   INSERT INTO hotspot_locations (
     source_key,
     osm_id,
@@ -88,67 +87,162 @@ const importHotspotStatement = db.prepare(`
     imported_at,
     updated_at
   ) VALUES (
-    @sourceKey,
-    @osmId,
-    @osmType,
-    @name,
-    @category,
-    @address,
-    @neighborhood,
-    @regionCode,
-    @regionName,
-    @regionNeedScore,
-    @priority,
-    @score,
-    0,
-    'Imported from OSM',
-    'Open shift',
-    @notes,
-    @lat,
-    @lng,
-    @tagsJson,
-    @importedAt,
-    @updatedAt
+    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+    $11, $12, FALSE, 'Imported from OSM', 'Open shift',
+    $13, $14, $15, $16::jsonb, $17::timestamptz, $18::timestamptz
   )
   ON CONFLICT(source_key) DO UPDATE SET
-    name = excluded.name,
-    category = excluded.category,
-    address = excluded.address,
-    neighborhood = excluded.neighborhood,
-    region_code = excluded.region_code,
-    region_name = excluded.region_name,
-    region_need_score = excluded.region_need_score,
-    priority = excluded.priority,
-    score = excluded.score,
-    lat = excluded.lat,
-    lng = excluded.lng,
-    tags_json = excluded.tags_json,
-    imported_at = excluded.imported_at,
-    updated_at = excluded.updated_at
-`);
+    name = EXCLUDED.name,
+    category = EXCLUDED.category,
+    address = EXCLUDED.address,
+    neighborhood = EXCLUDED.neighborhood,
+    region_code = EXCLUDED.region_code,
+    region_name = EXCLUDED.region_name,
+    region_need_score = EXCLUDED.region_need_score,
+    priority = EXCLUDED.priority,
+    score = EXCLUDED.score,
+    lat = EXCLUDED.lat,
+    lng = EXCLUDED.lng,
+    tags_json = EXCLUDED.tags_json,
+    imported_at = EXCLUDED.imported_at,
+    updated_at = EXCLUDED.updated_at
+`;
 
-const selectAllStatement = db.prepare(`
-  SELECT *
-  FROM hotspot_locations
-  ORDER BY score DESC, imported_at DESC, name ASC
-`);
+async function importHotspotsFromOsm({ lat, lng, radiusMiles }) {
+  const radiusMeters = Math.round(radiusMiles * 1609.34);
+  const queryText = buildOverpassQuery({ lat, lng, radiusMeters });
+  const payload = await fetchOverpassPayload(queryText);
+  const importedAt = new Date().toISOString();
+  const regions = await getStoredNeedRegions();
+  const candidates = (payload.elements || [])
+    .map((element) => mapOsmElementToHotspot(element, importedAt, regions))
+    .filter(Boolean);
+  const hotspots = dedupeHotspots(candidates);
+  let importedCount = 0;
+  const client = await getPool().connect();
 
-const selectByIdStatement = db.prepare(`
-  SELECT *
-  FROM hotspot_locations
-  WHERE id = ?
-`);
+  try {
+    await client.query("BEGIN");
 
-const updateStatusStatement = db.prepare(`
-  UPDATE hotspot_locations
-  SET
-    covered = @covered,
-    last_checked = @lastChecked,
-    assigned_to = @assignedTo,
-    notes = @notes,
-    updated_at = @updatedAt
-  WHERE id = @id
-`);
+    for (const hotspot of hotspots) {
+      await client.query(UPSERT_HOTSPOT_SQL, [
+        hotspot.sourceKey,
+        hotspot.osmId,
+        hotspot.osmType,
+        hotspot.name,
+        hotspot.category,
+        hotspot.address,
+        hotspot.neighborhood,
+        hotspot.regionCode,
+        hotspot.regionName,
+        hotspot.regionNeedScore,
+        hotspot.priority,
+        hotspot.score,
+        hotspot.notes,
+        hotspot.lat,
+        hotspot.lng,
+        hotspot.tagsJson,
+        hotspot.importedAt,
+        hotspot.updatedAt,
+      ]);
+      importedCount += 1;
+    }
+
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+
+  return {
+    importedCount,
+    sourceCount: candidates.length,
+    importedAt,
+  };
+}
+
+async function getStoredHotspots({ lat, lng, radiusMiles, limit = 5000 }) {
+  const result = await query(`
+    SELECT *
+    FROM hotspot_locations
+    ORDER BY score DESC, imported_at DESC, name ASC
+  `);
+
+  const allRows = dedupeHotspots(
+    result.rows
+      .map(normalizeRow)
+      .filter((row) => Boolean(row) && Boolean(CATEGORY_SCORES[row.category])),
+    0.08,
+  );
+
+  if (Number.isFinite(lat) && Number.isFinite(lng) && Number.isFinite(radiusMiles)) {
+    return allRows
+      .map((row) => ({
+        ...row,
+        distanceMiles: getDistanceMiles(lat, lng, row.lat, row.lng),
+      }))
+      .filter((row) => row.distanceMiles <= radiusMiles)
+      .sort((a, b) => {
+        if (a.score !== b.score) return b.score - a.score;
+        return a.distanceMiles - b.distanceMiles;
+      })
+      .slice(0, limit)
+      .map(({ distanceMiles, ...row }) => row);
+  }
+
+  return allRows.slice(0, limit);
+}
+
+async function updateHotspotStatus(id, updates) {
+  const existingResult = await query(
+    `
+      SELECT *
+      FROM hotspot_locations
+      WHERE id = $1
+    `,
+    [id],
+  );
+  const existing = existingResult.rows[0];
+  if (!existing) return null;
+
+  const nextCovered =
+    typeof updates.covered === "boolean" ? updates.covered : Boolean(existing.covered);
+  const now = new Date().toISOString();
+
+  await query(
+    `
+      UPDATE hotspot_locations
+      SET
+        covered = $1,
+        last_checked = $2,
+        assigned_to = $3,
+        notes = $4,
+        updated_at = $5::timestamptz
+      WHERE id = $6
+    `,
+    [
+      nextCovered,
+      updates.lastChecked || "Just now",
+      updates.assignedTo || (nextCovered ? "Volunteer confirmed" : "Open shift"),
+      typeof updates.notes === "string" ? updates.notes : existing.notes,
+      now,
+      id,
+    ],
+  );
+
+  const updatedResult = await query(
+    `
+      SELECT *
+      FROM hotspot_locations
+      WHERE id = $1
+    `,
+    [id],
+  );
+
+  return normalizeRow(updatedResult.rows[0]);
+}
 
 function buildOverpassQuery({ lat, lng, radiusMeters }) {
   const filters = OSM_TAG_FILTERS.map(
@@ -165,34 +259,7 @@ out center tags;
   `.trim();
 }
 
-async function importHotspotsFromOsm({ lat, lng, radiusMiles }) {
-  const radiusMeters = Math.round(radiusMiles * 1609.34);
-  const query = buildOverpassQuery({ lat, lng, radiusMeters });
-  const payload = await fetchOverpassPayload(query);
-  const importedAt = new Date().toISOString();
-  const candidates = (payload.elements || [])
-    .map((element) => mapOsmElementToHotspot(element, importedAt))
-    .filter(Boolean);
-  const hotspots = dedupeHotspots(candidates);
-  let importedCount = 0;
-
-  const transaction = db.transaction((rows) => {
-    for (const hotspot of rows) {
-      importHotspotStatement.run(hotspot);
-      importedCount += 1;
-    }
-  });
-
-  transaction(hotspots);
-
-  return {
-    importedCount,
-    sourceCount: candidates.length,
-    importedAt,
-  };
-}
-
-async function fetchOverpassPayload(query) {
+async function fetchOverpassPayload(queryText) {
   const failures = [];
 
   for (const endpoint of OVERPASS_ENDPOINTS) {
@@ -205,7 +272,7 @@ async function fetchOverpassPayload(query) {
         headers: {
           "Content-Type": "text/plain",
         },
-        body: query,
+        body: queryText,
         signal: controller.signal,
       });
 
@@ -225,80 +292,6 @@ async function fetchOverpassPayload(query) {
   throw new Error(`All Overpass endpoints failed. ${failures.join(" | ")}`);
 }
 
-function getStoredHotspots({ lat, lng, radiusMiles, limit = 5000 }) {
-  const allRows = dedupeHotspots(
-    selectAllStatement
-      .all()
-      .map(normalizeRow)
-      .filter((row) => Boolean(row) && Boolean(CATEGORY_SCORES[row.category])),
-    0.08,
-  );
-
-  if (
-    Number.isFinite(lat) &&
-    Number.isFinite(lng) &&
-    Number.isFinite(radiusMiles)
-  ) {
-    return allRows
-      .map((row) => ({
-        ...row,
-        distanceMiles: getDistanceMiles(lat, lng, row.lat, row.lng),
-      }))
-      .filter((row) => row.distanceMiles <= radiusMiles)
-      .sort((a, b) => {
-        if (a.score !== b.score) return b.score - a.score;
-        return a.distanceMiles - b.distanceMiles;
-      })
-      .slice(0, limit)
-      .map(({ distanceMiles, ...row }) => row);
-  }
-
-  return allRows.slice(0, limit);
-}
-
-function getStoredHotspotsWithPlacementSummary(options = {}) {
-  return attachSummariesToHotspots(getStoredHotspots(options));
-}
-
-function getHotspotById(id) {
-  return normalizeRow(selectByIdStatement.get(id));
-}
-
-function getHotspotByIdWithPlacementSummary(id) {
-  const hotspot = getHotspotById(id);
-  if (!hotspot) return null;
-
-  const summary = getTargetSummary(`hotspot:${hotspot.id}`);
-
-  return {
-    ...hotspot,
-    placementTargetId: `hotspot:${hotspot.id}`,
-    ...summary,
-  };
-}
-
-function updateHotspotStatus(id, updates) {
-  const existing = selectByIdStatement.get(id);
-  if (!existing) return null;
-
-  const nextCovered =
-    typeof updates.covered === "boolean" ? updates.covered : Boolean(existing.covered);
-  const now = new Date().toISOString();
-
-  updateStatusStatement.run({
-    id,
-    covered: nextCovered ? 1 : 0,
-    lastChecked: updates.lastChecked || "Just now",
-    assignedTo:
-      updates.assignedTo ||
-      (nextCovered ? "Volunteer confirmed" : "Open shift"),
-    notes: typeof updates.notes === "string" ? updates.notes : existing.notes,
-    updatedAt: now,
-  });
-
-  return getHotspotByIdWithPlacementSummary(id);
-}
-
 function normalizeRow(row) {
   if (!row) return null;
 
@@ -313,20 +306,21 @@ function normalizeRow(row) {
     neighborhood: row.neighborhood || "Area not tagged",
     regionCode: row.region_code || null,
     regionName: row.region_name || null,
-    regionNeedScore: row.region_need_score ?? null,
+    regionNeedScore: row.region_need_score === null ? null : Number(row.region_need_score),
     priority: row.priority,
-    score: row.score || 0,
+    score: Number(row.score || 0),
     covered: Boolean(row.covered),
     lastChecked: row.last_checked,
     assignedTo: row.assigned_to,
     notes: row.notes,
-    lat: row.lat,
-    lng: row.lng,
-    importedAt: row.imported_at,
+    lat: Number(row.lat),
+    lng: Number(row.lng),
+    importedAt:
+      row.imported_at instanceof Date ? row.imported_at.toISOString() : row.imported_at,
   };
 }
 
-function mapOsmElementToHotspot(element, importedAt) {
+function mapOsmElementToHotspot(element, importedAt, needRegions) {
   const tags = element.tags || {};
   const coordinates = getCoordinates(element);
   const category = mapCategory(tags);
@@ -341,7 +335,11 @@ function mapOsmElementToHotspot(element, importedAt) {
     tags["is_in:city"] ||
     "";
   const address = buildAddress(tags);
-  const needRegion = findNeedRegionForPoint(coordinates.lat, coordinates.lng);
+  const needRegion = findNeedRegionForPointInRegions(
+    coordinates.lat,
+    coordinates.lng,
+    needRegions,
+  );
   const score = calculateHotspotScore({
     category,
     tags,
@@ -514,8 +512,5 @@ function getDistanceMiles(fromLat, fromLng, toLat, toLng) {
 module.exports = {
   importHotspotsFromOsm,
   getStoredHotspots,
-  getStoredHotspotsWithPlacementSummary,
-  getHotspotById,
-  getHotspotByIdWithPlacementSummary,
   updateHotspotStatus,
 };

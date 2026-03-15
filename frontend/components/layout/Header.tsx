@@ -1,5 +1,7 @@
 "use client";
 
+import Image from "next/image";
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
@@ -30,11 +32,24 @@ export default function Header({ isMobile, onToggleSidebar }: HeaderProps) {
   const pathname = usePathname();
   const baseMeta = META[pathname] ?? META["/"];
   const { user } = useAuth();
+  const [mapSearch, setMapSearch] = useState("");
   const title =
     pathname === "/" && user
       ? `Welcome back, ${user.username} 👋`
       : baseMeta.title;
   const meta = { ...baseMeta, title };
+  const isMapPage = pathname === "/map";
+
+  function submitMapSearch() {
+    const query = mapSearch.trim();
+    if (!query) return;
+
+    window.dispatchEvent(
+      new CustomEvent("lemontree:map-search", {
+        detail: query,
+      }),
+    );
+  }
 
   return (
     <header
@@ -108,7 +123,57 @@ export default function Header({ isMobile, onToggleSidebar }: HeaderProps) {
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
-        {!isMobile ? (
+        {!isMobile && isMapPage ? (
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              submitMapSearch();
+            }}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "5px 6px 5px 12px",
+              borderRadius: 12,
+              background: "rgba(0,0,0,0.045)",
+              border: "1px solid rgba(0,0,0,0.07)",
+              width: 310,
+            }}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#9a8a60" strokeWidth="2.2" strokeLinecap="round">
+              <circle cx="11" cy="11" r="8" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+            <input
+              value={mapSearch}
+              onChange={(event) => setMapSearch(event.target.value)}
+              placeholder="Search a NYC address or neighborhood"
+              style={{
+                flex: 1,
+                minWidth: 0,
+                border: "none",
+                outline: "none",
+                background: "transparent",
+                color: "#5f502d",
+                fontSize: 12.5,
+              }}
+            />
+            <button
+              type="submit"
+              style={{
+                borderRadius: 10,
+                padding: "7px 12px",
+                background: "linear-gradient(135deg, #f5c842 0%, #e8a200 100%)",
+                color: "#1a1000",
+                fontSize: 12,
+                fontWeight: 700,
+                boxShadow: "0 2px 10px rgba(245,200,66,0.25)",
+              }}
+            >
+              Go
+            </button>
+          </form>
+        ) : !isMobile ? (
           <div
             style={{
               display: "flex",
@@ -179,9 +244,23 @@ export default function Header({ isMobile, onToggleSidebar }: HeaderProps) {
               color: "#1a1000",
               boxShadow: "0 2px 10px rgba(245,200,66,0.35)",
               textDecoration: "none",
+              overflow: "hidden",
             }}
           >
-            {user ? getInitial(user.username) : "?"}
+            {user?.profile_photo_url ? (
+              <Image
+                src={user.profile_photo_url}
+                alt={user.username}
+                width={36}
+                height={36}
+                unoptimized
+                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+              />
+            ) : user ? (
+              getInitial(user.username)
+            ) : (
+              "?"
+            )}
           </div>
         </Link>
       </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
@@ -370,9 +371,23 @@ export default function Sidebar({ isMobile, isOpen, onClose }: SidebarProps) {
               fontWeight: 700,
               color: "#1a1000",
               flexShrink: 0,
+              overflow: "hidden",
             }}
           >
-            {user ? getInitial(user.username) : "?"}
+            {user?.profile_photo_url ? (
+              <Image
+                src={user.profile_photo_url}
+                alt={user.username}
+                width={30}
+                height={30}
+                unoptimized
+                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+              />
+            ) : user ? (
+              getInitial(user.username)
+            ) : (
+              "?"
+            )}
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div
