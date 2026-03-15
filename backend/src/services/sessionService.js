@@ -1,4 +1,5 @@
 const repository = require("../data/sessionRepository");
+const statsRepository = require("../data/statsRepository");
 
 const METERS_TO_MILES = 0.000621371;
 
@@ -154,7 +155,20 @@ async function saveSession(payload, userId) {
     throw error;
   }
 
-  return repository.createSession(normalizedPayload);
+  const session = await repository.createSession(normalizedPayload);
+
+  const flyersDelta = Array.isArray(normalizedPayload.stops) ? normalizedPayload.stops.length : 0;
+  const hoursDelta = (normalizedPayload.durationSeconds || 0) / 3600;
+  const sessionDate = normalizedPayload.startedAt ? normalizedPayload.startedAt.slice(0, 10) : null;
+  if (sessionDate && (flyersDelta > 0 || hoursDelta > 0)) {
+    try {
+      await statsRepository.upsertUserStatsForSession(userId, flyersDelta, hoursDelta, sessionDate);
+    } catch (err) {
+      console.error("Failed to update user_stats for session:", err);
+    }
+  }
+
+  return session;
 }
 
 async function removeSession(id, userId) {

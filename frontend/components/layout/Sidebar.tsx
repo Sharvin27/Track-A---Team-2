@@ -112,6 +112,7 @@ export default function Sidebar({ isMobile, isOpen, onClose }: SidebarProps) {
   const pathname = usePathname();
   const [hovered, setHovered] = useState<string | null>(null);
   const { user, logout } = useAuth();
+  const displayName = user?.full_name?.trim() || user?.username;
 
   return (
     <aside
@@ -377,14 +378,14 @@ export default function Sidebar({ isMobile, isOpen, onClose }: SidebarProps) {
             {user?.profile_photo_url ? (
               <Image
                 src={user.profile_photo_url}
-                alt={user.username}
+                alt={displayName ?? user.username}
                 width={30}
                 height={30}
                 unoptimized
                 style={{ width: "100%", height: "100%", objectFit: "cover" }}
               />
             ) : user ? (
-              getInitial(user.username)
+              getInitial(displayName ?? user.username)
             ) : (
               "?"
             )}
@@ -400,7 +401,7 @@ export default function Sidebar({ isMobile, isOpen, onClose }: SidebarProps) {
                 whiteSpace: "nowrap",
               }}
             >
-              {user ? user.username : "Guest"}
+              {user ? (displayName ?? user.username) : "Guest"}
             </div>
             <div style={{ fontSize: 10.5, color: "rgba(237,229,204,0.38)", marginTop: 1 }}>
               {user?.isGuest ? "Guest" : user ? "Volunteer" : "Log in to get started"}

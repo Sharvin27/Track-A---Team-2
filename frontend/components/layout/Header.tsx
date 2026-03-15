@@ -25,17 +25,19 @@ function getInitial(name: string): string {
 
 interface HeaderProps {
   isMobile: boolean;
+  showSidebarToggle?: boolean;
   onToggleSidebar: () => void;
 }
 
-export default function Header({ isMobile, onToggleSidebar }: HeaderProps) {
+export default function Header({ isMobile, showSidebarToggle = true, onToggleSidebar }: HeaderProps) {
   const pathname = usePathname();
   const baseMeta = META[pathname] ?? META["/"];
   const { user } = useAuth();
   const [mapSearch, setMapSearch] = useState("");
+  const displayName = user?.full_name?.trim() || user?.username;
   const title =
     pathname === "/" && user
-      ? `Welcome back, ${user.username} 👋`
+      ? `Welcome back, ${displayName ?? "there"} 👋`
       : baseMeta.title;
   const meta = { ...baseMeta, title };
   const isMapPage = pathname === "/map";
@@ -72,7 +74,7 @@ export default function Header({ isMobile, onToggleSidebar }: HeaderProps) {
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
-        {isMobile ? (
+        {isMobile && showSidebarToggle ? (
           <button
             type="button"
             aria-label="Toggle navigation"
@@ -250,14 +252,14 @@ export default function Header({ isMobile, onToggleSidebar }: HeaderProps) {
             {user?.profile_photo_url ? (
               <Image
                 src={user.profile_photo_url}
-                alt={user.username}
+                alt={displayName ?? user.username}
                 width={36}
                 height={36}
                 unoptimized
                 style={{ width: "100%", height: "100%", objectFit: "cover" }}
               />
             ) : user ? (
-              getInitial(user.username)
+              getInitial(displayName ?? user.username)
             ) : (
               "?"
             )}

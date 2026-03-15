@@ -24,7 +24,7 @@ type AuthContextValue = {
   loading: boolean;
   isGuest: boolean;
   login: (email: string, password: string) => Promise<void>;
-  signup: (username: string, email: string, password: string) => Promise<void>;
+  signup: (fullName: string, username: string, email: string, password: string) => Promise<void>;
   signInAsGuest: () => void;
   logout: () => void;
   agreeToTerms: () => Promise<void>;
@@ -84,8 +84,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   const signup = useCallback(
-    async (username: string, email: string, password: string) => {
-      const { user: u, token: t } = await authApi.signup(username, email, password);
+    async (fullName: string, username: string, email: string, password: string) => {
+      const { user: u, token: t } = await authApi.signup(fullName, username, email, password);
       setToken(t);
       setUser(u);
       // Don't redirect yet; onboarding will show mission + terms, then redirect

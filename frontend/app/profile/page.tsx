@@ -6,20 +6,27 @@ import PageContainer from "@/components/layout/PageContainer";
 import SectionCard from "@/components/common/SectionCard";
 import StatCard from "@/components/common/StatCard";
 import { useAuth } from "@/context/AuthContext";
+import GuestGate from "@/components/auth/GuestGate";
 import { formatDistance } from "@/lib/distance";
 import { formatDuration } from "@/lib/session";
 import { uploadProfilePhoto } from "@/lib/auth-api";
 import { getSessions } from "@/lib/session-api";
+import { getBadges, type BadgesData } from "@/lib/badges-api";
+import { getLeaderboard, type LeaderboardEntry } from "@/lib/leaderboard-api";
+import {
+  generateCertificatePdf,
+  generateCertificatePng,
+  downloadBlob,
+} from "@/lib/certificate";
 import type { VolunteerSession } from "@/types/tracker";
 
-const badges = [
-  { label: "First Flyer", earned: true, tone: "#f6e58d" },
-  { label: "On a Streak", earned: true, tone: "#d9f99d" },
-  { label: "Zone Explorer", earned: true, tone: "#fde68a" },
-  { label: "100 Flyers", earned: true, tone: "#fef3c7" },
-  { label: "Top 5", earned: false, tone: "#f1f5f9" },
-  { label: "Community Star", earned: false, tone: "#f1f5f9" },
-];
+const BADGE_CONFIG = [
+  { key: "first_flyer" as const, label: "First Flyer", tone: "#f6e58d", emoji: "📄" },
+  { key: "hundred_flyers" as const, label: "100 Flyers", tone: "#fef3c7", emoji: "💯" },
+  { key: "on_a_streak" as const, label: "On a Streak", tone: "#d9f99d", emoji: "🔥" },
+  { key: "top_5" as const, label: "Top 5", tone: "#fde68a", emoji: "🏅" },
+  { key: "top_1" as const, label: "Top 1", tone: "#f5c842", emoji: "🏆" },
+] as const;
 
 function getInitials(name: string) {
   const parts = name.trim().split(/\s+/).slice(0, 2);
@@ -50,7 +57,7 @@ function buildActivityTitle(session: VolunteerSession) {
 }
 
 export default function ProfilePage() {
-  const { user, token, loading, isGuest, setUser } = useAuth();
+  const { user, token, loading, isGuest, setUser, logout } = useAuth();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [sessions, setSessions] = useState<VolunteerSession[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(true);
@@ -60,6 +67,12 @@ export default function ProfilePage() {
   const [routeZoom, setRouteZoom] = useState(1);
   const [photoState, setPhotoState] = useState<"idle" | "uploading" | "error">("idle");
   const [photoError, setPhotoError] = useState<string | null>(null);
+  const [badgesData, setBadgesData] = useState<BadgesData | null>(null);
+  const [badgesLoading, setBadgesLoading] = useState(true);
+  const [leaderboardEntries, setLeaderboardEntries] = useState<LeaderboardEntry[]>([]);
+  const [leaderboardLoading, setLeaderboardLoading] = useState(true);
+  const [certificateLoading, setCertificateLoading] = useState<"idle" | "pdf" | "png">("idle");
+  const [certificateError, setCertificateError] = useState<string | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -112,6 +125,61 @@ export default function ProfilePage() {
     };
   }, [isGuest, token]);
 
+  useEffect(() => {
+    let cancelled = false;
+    if (!token || isGuest) {
+      setBadgesData(null);
+      setBadgesLoading(false);
+      return;
+    }
+    setBadgesLoading(true);
+    getBadges(token)
+      .then((res) => {
+        if (!cancelled) setBadgesData(res.data);
+      })
+      .catch(() => {
+        if (!cancelled) setBadgesData(null);
+      })
+      .finally(() => {
+        if (!cancelled) setBadgesLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [token, isGuest]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (isGuest) {
+      setLeaderboardEntries([]);
+      setLeaderboardLoading(false);
+      return;
+    }
+    setLeaderboardLoading(true);
+    getLeaderboard()
+      .then((res) => {
+        if (!cancelled) setLeaderboardEntries(res.data ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) setLeaderboardEntries([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLeaderboardLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isGuest]);
+
+  const { myRankEntry, personAhead } = useMemo(() => {
+    if (!user?.id || !leaderboardEntries.length) {
+      return { myRankEntry: null, personAhead: null };
+    }
+    const my = leaderboardEntries.find((e) => e.id === user.id) ?? null;
+    const ahead = my ? leaderboardEntries.find((e) => e.rank === my.rank - 1) ?? null : null;
+    return { myRankEntry: my, personAhead: ahead };
+  }, [user?.id, leaderboardEntries]);
+
   const stats = useMemo(() => {
     const totalDistanceMeters = sessions.reduce((total, session) => total + session.totalDistanceMeters, 0);
     const totalDurationSeconds = sessions.reduce((total, session) => total + session.durationSeconds, 0);
@@ -126,7 +194,7 @@ export default function ProfilePage() {
   }, [sessions]);
 
   const recentSessions = sessions.slice(0, 5);
-  const displayName = user?.username || "Volunteer";
+  const displayName = user?.full_name?.trim() || user?.username || "Volunteer";
   const emailLabel = user?.email || "Email unavailable";
   const joinedLabel = user?.created_at ? formatJoinedDate(user.created_at) : "Joined recently";
 
@@ -156,6 +224,15 @@ export default function ProfilePage() {
     } finally {
       event.target.value = "";
     }
+  }
+
+  if (isGuest) {
+    return (
+      <GuestGate
+        message="Login or sign up to view your profile and track your impact."
+        onGoToLogin={logout}
+      />
+    );
   }
 
   return (
@@ -262,32 +339,60 @@ export default function ProfilePage() {
                   </div>
                 ))}
               </div>
+
+              {!isGuest ? (
+                <button
+                  type="button"
+                  onClick={() => logout()}
+                  style={{
+                    width: "100%",
+                    marginTop: 18,
+                    padding: "10px 14px",
+                    borderRadius: 12,
+                    border: "1px solid rgba(190,155,70,0.28)",
+                    background: "rgba(239,68,68,0.08)",
+                    color: "#b91c1c",
+                    fontSize: 13,
+                    fontWeight: 700,
+                    cursor: "pointer",
+                  }}
+                >
+                  Log out
+                </button>
+              ) : null}
             </div>
           </SectionCard>
 
-          <SectionCard title="Badges" subtitle="Static placeholders until achievements are modeled in the database.">
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
-              {badges.map((badge) => (
-                <div
-                  key={badge.label}
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    gap: 6,
-                    padding: "12px 8px",
-                    borderRadius: 14,
-                    textAlign: "center",
-                    background: badge.earned ? badge.tone : "#f8f7f0",
-                    border: `1px solid ${badge.earned ? "rgba(185,207,81,0.35)" : "rgba(0,0,0,0.05)"}`,
-                    opacity: badge.earned ? 1 : 0.58,
-                  }}
-                >
-                  <span style={{ width: 28, height: 28, borderRadius: 999, background: badge.earned ? "rgba(49,64,31,0.08)" : "rgba(148,163,184,0.14)" }} />
-                  <span style={{ fontSize: 10.5, fontWeight: 700, color: "#243112", lineHeight: 1.25 }}>{badge.label}</span>
-                </div>
-              ))}
-            </div>
+          <SectionCard title="Badges" subtitle="Earned from your volunteer activity and leaderboard standing.">
+            {badgesLoading ? (
+              <p style={{ fontSize: 13, color: "#8a7a50" }}>Loading badges...</p>
+            ) : (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 10 }}>
+                {BADGE_CONFIG.map((badge) => {
+                  const earned = badgesData ? Boolean(badgesData[badge.key]) : false;
+                  return (
+                    <div
+                      key={badge.label}
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        gap: 6,
+                        padding: "12px 8px",
+                        borderRadius: 14,
+                        textAlign: "center",
+                        background: earned ? badge.tone : "#f8f7f0",
+                        border: `1px solid ${earned ? "rgba(185,207,81,0.35)" : "rgba(0,0,0,0.05)"}`,
+                        opacity: earned ? 1 : 0.58,
+                      }}
+                    >
+                      <span style={{ fontSize: 28, lineHeight: 1 }}>{badge.emoji}</span>
+                      <span style={{ fontSize: 10.5, fontWeight: 700, color: "#243112", lineHeight: 1.25 }}>{badge.label}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </SectionCard>
         </div>
 
@@ -375,20 +480,196 @@ export default function ProfilePage() {
             )}
           </SectionCard>
 
-          <SectionCard title="Progress to #3" subtitle="Leaderboard progress stays static until rankings are backed by real database data.">
+          <SectionCard
+            title="Leaderboard progress"
+            subtitle={myRankEntry ? `Rank #${myRankEntry.rank} of ${leaderboardEntries.length}` : "Your standing vs other volunteers"}
+          >
             <div style={{ padding: "8px 0" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-                <span style={{ fontSize: 12, color: "#7a6a40" }}>You | 340 flyers</span>
-                <span style={{ fontSize: 12, color: "#7a6a40" }}>Sofia #3 | 640 flyers</span>
-              </div>
-              <div style={{ height: 8, borderRadius: 99, background: "rgba(0,0,0,0.07)", overflow: "hidden" }}>
-                <div style={{ height: "100%", width: `${(340 / 640) * 100}%`, borderRadius: 99, background: "linear-gradient(90deg,#e0c13a,#b9cf51)", boxShadow: "0 0 8px rgba(185,207,81,0.5)" }} />
-              </div>
-              <p style={{ fontSize: 12, color: "#9a8a60", marginTop: 8 }}>
-                <strong style={{ color: "#1a1600" }}>300 more flyers</strong> to reach rank #3
-              </p>
+              {leaderboardLoading ? (
+                <p style={{ fontSize: 13, color: "#8a7a50" }}>Loading your ranking...</p>
+              ) : myRankEntry?.rank === 1 ? (
+                <div style={{ textAlign: "center", padding: "12px 0" }}>
+                  <p style={{ fontSize: 18, fontWeight: 700, color: "#1a1600", fontFamily: "'Fraunces', Georgia, serif", margin: 0 }}>
+                    You&rsquo;re the greatest volunteer
+                  </p>
+                  <p style={{ fontSize: 12, color: "#7a6a40", marginTop: 6 }}>
+                    #1 with {myRankEntry.flyers.toLocaleString()} flyers
+                  </p>
+                </div>
+              ) : myRankEntry && personAhead ? (
+                (() => {
+                  const targetFlyers = Math.max(1, personAhead.flyers);
+                  const myFlyers = myRankEntry.flyers;
+                  const progressPercent = Math.min(100, (myFlyers / targetFlyers) * 100);
+                  const remaining = Math.max(0, targetFlyers - myFlyers);
+                  return (
+                    <>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                        <span style={{ fontSize: 12, color: "#7a6a40" }}>You | {myFlyers.toLocaleString()} flyers</span>
+                        <span style={{ fontSize: 12, color: "#7a6a40" }}>{personAhead.username} #{personAhead.rank} | {personAhead.flyers.toLocaleString()} flyers</span>
+                      </div>
+                      <p style={{ fontSize: 11, color: "#9a8a60", marginBottom: 6 }}>
+                        Progress to match {personAhead.username}&rsquo;s flyers
+                      </p>
+                      <div style={{ height: 10, borderRadius: 99, background: "rgba(0,0,0,0.08)", overflow: "hidden" }}>
+                        <div
+                          style={{
+                            height: "100%",
+                            width: `${progressPercent}%`,
+                            borderRadius: 99,
+                            background: "linear-gradient(90deg,#e0c13a,#b9cf51)",
+                            boxShadow: "0 0 8px rgba(185,207,81,0.5)",
+                            transition: "width 0.3s ease",
+                          }}
+                        />
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6 }}>
+                        <span style={{ fontSize: 11, color: "#7a6a40" }}>
+                          {progressPercent.toFixed(0)}% of the way there
+                        </span>
+                        <span style={{ fontSize: 11, color: "#9a8a60" }}>
+                          {remaining.toLocaleString()} flyers left to match
+                        </span>
+                      </div>
+                      <p style={{ fontSize: 12, color: "#9a8a60", marginTop: 10 }}>
+                        <strong style={{ color: "#1a1600" }}>
+                          {Math.max(0, personAhead.flyers - myFlyers + 1).toLocaleString()} more flyers
+                        </strong>{" "}
+                        to reach rank #{personAhead.rank}
+                      </p>
+                    </>
+                  );
+                })()
+              ) : myRankEntry ? (
+                <p style={{ fontSize: 13, color: "#8a7a50" }}>You&rsquo;re on the board at rank #{myRankEntry.rank} with {myRankEntry.flyers.toLocaleString()} flyers.</p>
+              ) : (
+                <p style={{ fontSize: 13, color: "#8a7a50" }}>Complete route sessions to appear on the leaderboard.</p>
+              )}
             </div>
           </SectionCard>
+
+          <div
+            style={{
+              borderRadius: 18,
+              overflow: "hidden",
+              background: "linear-gradient(145deg, #f5e6b8 0%, #e8c547 35%, #d4a82b 100%)",
+              boxShadow: "0 0 32px rgba(212,168,43,0.4), 0 8px 24px rgba(0,0,0,0.12)",
+              border: "1px solid rgba(255,236,179,0.6)",
+              padding: "20px 18px",
+            }}
+          >
+            <div style={{ textAlign: "center", marginBottom: 14 }}>
+              <span style={{ fontSize: 32, lineHeight: 1, filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.2))" }}>📜</span>
+              <p
+                style={{
+                  margin: "10px 0 4px",
+                  fontFamily: "'Fraunces', Georgia, serif",
+                  fontSize: 18,
+                  fontWeight: 700,
+                  color: "#2d2208",
+                  letterSpacing: "-0.3px",
+                  textShadow: "0 1px 2px rgba(255,255,255,0.4)",
+                }}
+              >
+                Generate Certificate
+              </p>
+              <p style={{ fontSize: 11, color: "rgba(45,34,8,0.7)" }}>
+                {((badgesData?.flyers ?? 0) >= 1)
+                  ? "Download your volunteer certificate"
+                  : "Distribute at least 1 flyer to unlock"}
+              </p>
+            </div>
+            {certificateError && (
+              <p style={{ fontSize: 12, color: "#b91c1c", marginBottom: 8 }}>{certificateError}</p>
+            )}
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <button
+                type="button"
+                disabled={(badgesData?.flyers ?? 0) < 1 || certificateLoading !== "idle"}
+                onClick={async () => {
+                  if ((badgesData?.flyers ?? 0) < 1 || !user) return;
+                  setCertificateError(null);
+                  setCertificateLoading("pdf");
+                  try {
+                    const myEntry = user?.id ? leaderboardEntries.find((e) => e.id === user.id) : null;
+                    const hoursFromStats = myEntry?.hours ?? badgesData?.hours ?? 0;
+                    const hoursVolunteeredSeconds = Math.round(hoursFromStats * 3600);
+                    const blob = await generateCertificatePdf({
+                      fullName: displayName,
+                      flyersDistributed: badgesData?.flyers ?? 0,
+                      hoursVolunteeredSeconds,
+                      date: new Date(),
+                    });
+                    const dateStr = new Date().toISOString().slice(0, 10);
+                    downloadBlob(blob, `volunteer-certificate-${dateStr}.pdf`);
+                  } catch (e) {
+                    setCertificateError(e instanceof Error ? e.message : "Failed to generate certificate");
+                  } finally {
+                    setCertificateLoading("idle");
+                  }
+                }}
+                style={{
+                  width: "100%",
+                  padding: "12px 16px",
+                  borderRadius: 12,
+                  border: "1px solid rgba(45,34,8,0.25)",
+                  background: (badgesData?.flyers ?? 0) >= 1 && certificateLoading === "idle"
+                    ? "linear-gradient(180deg, #fff9e6 0%, #f5e6b8 100%)"
+                    : "rgba(0,0,0,0.12)",
+                  color: (badgesData?.flyers ?? 0) >= 1 && certificateLoading === "idle" ? "#2d2208" : "rgba(45,34,8,0.5)",
+                  fontSize: 13,
+                  fontWeight: 700,
+                  cursor: (badgesData?.flyers ?? 0) >= 1 && certificateLoading === "idle" ? "pointer" : "not-allowed",
+                  boxShadow: (badgesData?.flyers ?? 0) >= 1 && certificateLoading === "idle" ? "0 4px 16px rgba(212,168,43,0.35)" : "none",
+                }}
+              >
+                {certificateLoading === "pdf"
+                  ? "Generating…"
+                  : (badgesData?.flyers ?? 0) >= 1
+                    ? "Download certificate (PDF)"
+                    : "🔒 Locked"}
+              </button>
+              {(badgesData?.flyers ?? 0) >= 1 && (
+                <button
+                  type="button"
+                  disabled={certificateLoading !== "idle"}
+                  onClick={async () => {
+                    if (!user) return;
+                    setCertificateError(null);
+                    setCertificateLoading("png");
+                    try {
+                      const myEntry = user?.id ? leaderboardEntries.find((e) => e.id === user.id) : null;
+                      const hoursFromStats = myEntry?.hours ?? badgesData?.hours ?? 0;
+                      const hoursVolunteeredSeconds = Math.round(hoursFromStats * 3600);
+                      const blob = await generateCertificatePng({
+                        fullName: displayName,
+                        flyersDistributed: badgesData?.flyers ?? 0,
+                        hoursVolunteeredSeconds,
+                        date: new Date(),
+                      });
+                      const dateStr = new Date().toISOString().slice(0, 10);
+                      downloadBlob(blob, `volunteer-certificate-${dateStr}.png`);
+                    } catch (e) {
+                      setCertificateError(e instanceof Error ? e.message : "Failed to generate certificate");
+                    } finally {
+                      setCertificateLoading("idle");
+                    }
+                  }}
+                  style={{
+                    padding: "6px 12px",
+                    borderRadius: 8,
+                    border: "1px solid rgba(45,34,8,0.2)",
+                    background: "transparent",
+                    color: "rgba(45,34,8,0.85)",
+                    fontSize: 12,
+                    cursor: certificateLoading === "idle" ? "pointer" : "not-allowed",
+                  }}
+                >
+                  {certificateLoading === "png" ? "Generating…" : "Download as PNG"}
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 

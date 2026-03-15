@@ -10,6 +10,7 @@ const USER_SELECT = `
     users.id,
     users.username,
     users.email,
+    users.full_name,
     users.agreed_to_terms,
     users.created_at,
     profile_photos.image_url AS profile_photo_url
@@ -21,6 +22,7 @@ const USER_LOGIN_SELECT = `
     users.id,
     users.username,
     users.email,
+    users.full_name,
     users.password_hash,
     users.agreed_to_terms,
     users.created_at,
@@ -51,7 +53,7 @@ async function fetchUserById(userId) {
 
 async function signup(req, res) {
   try {
-    const { username, email, password } = req.body;
+    const { username, email, password, full_name: fullName } = req.body;
     if (!username?.trim() || !email?.trim() || !password) {
       return res.status(400).json({ error: "Username, email, and password are required." });
     }
@@ -64,10 +66,11 @@ async function signup(req, res) {
     }
 
     const password_hash = await bcrypt.hash(password, SALT_ROUNDS);
+    const fullNameTrimmed = typeof fullName === "string" ? fullName.trim() : "";
     const result = await query(
-      `INSERT INTO users (username, email, password_hash) VALUES ($1, $2, $3)
+      `INSERT INTO users (username, email, password_hash, full_name) VALUES ($1, $2, $3, $4)
        RETURNING id`,
-      [username.trim(), email.trim().toLowerCase(), password_hash]
+      [username.trim(), email.trim().toLowerCase(), password_hash, fullNameTrimmed]
     );
     const user = await fetchUserById(result.rows[0].id);
     const token = jwt.sign(

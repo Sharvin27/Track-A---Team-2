@@ -1,14 +1,22 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import Header from "./Header";
 import Sidebar from "./Sidebar";
 import ChatbotWidget from "../chat/ChatbotWidget";
+import { useAuth } from "@/context/AuthContext";
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const { user } = useAuth();
   const [isMobile, setIsMobile] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+
+  const showSidebar =
+    !!user &&
+    (pathname !== "/onboarding" || !!user.agreed_to_terms || !!user.isGuest);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia("(max-width: 960px)");
@@ -79,12 +87,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         touchAction: "pan-y",
       }}
     >
-      <Sidebar
-        isMobile={isMobile}
-        isOpen={sidebarOpen}
-        onClose={() => setSidebarOpen(false)}
-      />
-      {isMobile && sidebarOpen ? (
+      {showSidebar ? (
+        <>
+          <Sidebar
+            isMobile={isMobile}
+            isOpen={sidebarOpen}
+            onClose={() => setSidebarOpen(false)}
+          />
+          {isMobile && sidebarOpen ? (
         <button
           type="button"
           aria-label="Close navigation"
@@ -98,6 +108,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             zIndex: 45,
           }}
         />
+          ) : null}
+        </>
       ) : null}
       <div
         style={{
@@ -111,6 +123,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       >
         <Header
           isMobile={isMobile}
+          showSidebarToggle={showSidebar}
           onToggleSidebar={() => setSidebarOpen((current) => !current)}
         />
         <main

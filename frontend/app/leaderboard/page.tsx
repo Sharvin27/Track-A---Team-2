@@ -150,6 +150,7 @@ function MedalSymbol({ color, label }: { color: string; label: string }) {
 export default function LeaderboardPage() {
   const { user, logout } = useAuth();
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
+  const [podiumEntries, setPodiumEntries] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -163,6 +164,7 @@ export default function LeaderboardPage() {
         const response = await getLeaderboard();
         if (!cancelled) {
           setEntries(response.data);
+          setPodiumEntries(response.podium ?? []);
         }
       } catch (loadError) {
         if (!cancelled) {
@@ -187,45 +189,42 @@ export default function LeaderboardPage() {
       return [];
     }
 
-    const maxDuration = Math.max(...entries.map((entry) => entry.total_duration_seconds), 1);
+    const maxHours = Math.max(...entries.map((entry) => entry.hours ?? 0), 0.01);
 
-    return entries.map((entry, index) => {
-      const staticMetric = getStaticMetric(index);
-
+    return entries.map((entry) => {
+      const hours = entry.hours ?? entry.total_duration_seconds / 3600;
       return {
         ...entry,
-        ...staticMetric,
+        flyers: entry.flyers ?? 0,
+        zones: 0,
+        badge: entry.rank <= 3 ? String(entry.rank) : null,
+        color: rankColors[entry.rank] ?? "#6b7280",
         avatar: getInitials(entry.username),
         isYou: entry.id === user?.id,
         hoursLabel: formatHours(entry.total_duration_seconds),
-        progressPercent: Math.max(6, Math.round((entry.total_duration_seconds / maxDuration) * 100)),
+        progressPercent: Math.max(6, Math.round((hours / maxHours) * 100)),
       };
     });
   }, [entries, user?.id]);
 
   const podiumRows = useMemo(() => {
-    const topThree = displayRows.slice(0, 3);
-
     return podiumSlots
       .map((slot) => {
-        const entry = topThree.find((item) => item.rank === slot.rank);
-        if (!entry) {
-          return null;
-        }
-
+        const p = podiumEntries[slot.rank - 1];
+        if (!p) return null;
         return {
-          name: entry.username,
-          avatar: entry.avatar,
-          flyers: entry.flyers,
-          color: entry.color,
+          name: p.username,
+          avatar: getInitials(p.username),
+          flyers: p.flyers ?? 0,
+          color: rankColors[slot.rank] ?? "#f5c842",
           height: slot.height,
-          rank: entry.rank,
+          rank: slot.rank,
           pos: slot.pos,
-          profilePhotoUrl: entry.profile_photo_url,
+          profilePhotoUrl: p.profile_photo_url,
         };
       })
       .filter((entry): entry is PodiumRow => entry !== null);
-  }, [displayRows]);
+  }, [podiumEntries]);
 
   const yourStanding = useMemo(
     () => displayRows.find((entry) => entry.isYou) ?? null,
@@ -305,9 +304,9 @@ export default function LeaderboardPage() {
                 </p>
               </div>
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                {displayRows.slice(0, 3).map((entry) => (
+                {podiumRows.map((row) => (
                   <span
-                    key={entry.id}
+                    key={row.rank}
                     style={{
                       fontSize: 11,
                       fontWeight: 600,
@@ -316,10 +315,10 @@ export default function LeaderboardPage() {
                       background: "rgba(245,200,66,0.12)",
                       color: "rgba(245,200,66,0.8)",
                       border: "1px solid rgba(245,200,66,0.2)",
-                      boxShadow: `0 0 18px ${rankColors[entry.rank] ?? "#f5c842"}33`,
+                      boxShadow: `0 0 18px ${rankColors[row.rank] ?? "#f5c842"}33`,
                     }}
                   >
-                    #{entry.rank} {entry.avatar}
+                    #{row.rank} {row.avatar}
                   </span>
                 ))}
               </div>
@@ -377,19 +376,21 @@ export default function LeaderboardPage() {
               flexWrap: "wrap",
             }}
           >
-            {displayRows.slice(0, 3).map((entry) => (
-              <div key={entry.id} style={{ textAlign: "center" }}>
+            {podiumRows.map((row) => (
+              <div key={row.rank} style={{ textAlign: "center" }}>
                 <p
                   style={{
                     fontSize: 11,
                     fontWeight: 700,
-                    color: rankColors[entry.rank] ?? "#f5c842",
+                    color: rankColors[row.rank] ?? "#f5c842",
                     marginBottom: 1,
                   }}
                 >
-                  #{entry.rank} | {entry.username}
+                  #{row.rank} | {row.name}
                 </p>
-                <p style={{ fontSize: 10.5, color: "rgba(245,200,66,0.4)" }}>{entry.hoursLabel}</p>
+                <p style={{ fontSize: 10.5, color: "rgba(245,200,66,0.4)" }}>
+                  {formatHours((podiumEntries[row.rank - 1]?.total_duration_seconds ?? 0))}
+                </p>
               </div>
             ))}
           </div>
@@ -530,7 +531,7 @@ export default function LeaderboardPage() {
 
       <SectionCard
         title="Full Rankings"
-        subtitle={`${displayRows.length || 0} volunteers | ranked by hours`}
+        subtitle={`${displayRows.length || 0} volunteers | ranked by impact (hours + flyers)`}
         action={
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
             {["All Time", "This Month", "This Week"].map((tab, index) => (
@@ -562,14 +563,14 @@ export default function LeaderboardPage() {
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "44px minmax(180px, 1fr) 200px 90px 70px 70px",
+                gridTemplateColumns: "44px minmax(180px, 1fr) 200px 90px 70px",
                 gap: 12,
                 padding: "0 10px 10px",
                 borderBottom: "1px solid rgba(190,155,70,0.15)",
-                minWidth: 640,
+                minWidth: 600,
               }}
             >
-              {["#", "Volunteer", "Progress", "Flyers", "Zones", "Hours"].map((heading) => (
+              {["#", "Volunteer", "Progress", "Flyers", "Hours"].map((heading) => (
                 <span
                   key={heading}
                   style={{
@@ -613,7 +614,7 @@ export default function LeaderboardPage() {
                 style={{
                   animationDelay: `${0.3 + index * 0.06}s`,
                   display: "grid",
-                  gridTemplateColumns: "44px minmax(180px, 1fr) 200px 90px 70px 70px",
+                  gridTemplateColumns: "44px minmax(180px, 1fr) 200px 90px 70px",
                   gap: 12,
                   alignItems: "center",
                   padding: "10px 10px",
@@ -628,11 +629,11 @@ export default function LeaderboardPage() {
                   border: rowBorder,
                   boxShadow: topThreeBackground ? `0 10px 24px ${rankColors[volunteer.rank]}18` : "none",
                   marginBottom: 3,
-                  minWidth: 640,
+                  minWidth: 600,
                 }}
               >
                 <div style={{ textAlign: "center" }}>
-                  {volunteer.badge ? (
+                  {volunteer.rank <= 3 ? (
                     <span
                       style={{
                         display: "inline-flex",
@@ -724,7 +725,7 @@ export default function LeaderboardPage() {
                       ) : null}
                     </p>
                     <p style={{ fontSize: 11, color: "#9a8a60", marginTop: 1 }}>
-                      {volunteer.session_count} sessions | {volunteer.total_stops} stops
+                      {volunteer.flyers.toLocaleString()} flyers | {volunteer.hoursLabel}
                     </p>
                   </div>
                 </div>
@@ -771,8 +772,6 @@ export default function LeaderboardPage() {
                 >
                   {volunteer.flyers.toLocaleString()}
                 </span>
-
-                <span style={{ fontSize: 13, color: "#5a4a20" }}>{volunteer.zones}</span>
 
                 <span style={{ fontSize: 13, color: "#5a4a20" }}>{volunteer.hoursLabel}</span>
               </div>
