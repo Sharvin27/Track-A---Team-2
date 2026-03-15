@@ -1,16 +1,24 @@
 "use client";
 
+import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
 
 const META: Record<string, { title: string; sub: string }> = {
-  "/": { title: "Welcome back", sub: "Here's what's happening in your community today." },
-  "/map": { title: "Resource Map", sub: "Explore flyering zones and food access locations." },
+"/": { title: "Welcome back 👋", sub: "Here's what's happening in your community today." },
+  "/map": { title: "Resource Map 🗺️", sub: "Explore flyering zones and food access locations." },
   "/tracker": { title: "Route Tracker", sub: "Track volunteer outreach sessions in real time." },
-  "/profile": { title: "Your Profile", sub: "Track your volunteer contributions and impact." },
-  "/leaderboard": { title: "Leaderboard", sub: "Top volunteers making a difference this month." },
-  "/printers": { title: "Nearby Printers", sub: "Find a printer close to you for your flyers." },
-  "/onboarding": { title: "Get Started", sub: "Everything you need to begin volunteering." },
+  "/profile": { title: "Your Profile ✨", sub: "Track your volunteer contributions and impact." },
+  "/leaderboard": { title: "Leaderboard 🏆", sub: "Top volunteers making a difference this month." },
+  "/printers": { title: "Nearby Printers 🖨️", sub: "Find a printer close to you for your flyers." },
+  "/getstarted": { title: "Get Started 🚀", sub: "Everything you need to begin volunteering." },
+  "/onboarding": { title: "Log in", sub: "Sign in or create an account to continue." },
 };
+
+function getInitial(name: string): string {
+  if (!name?.trim()) return "?";
+  return name.trim()[0].toUpperCase();
+}
 
 interface HeaderProps {
   isMobile: boolean;
@@ -19,7 +27,13 @@ interface HeaderProps {
 
 export default function Header({ isMobile, onToggleSidebar }: HeaderProps) {
   const pathname = usePathname();
-  const meta = META[pathname] ?? META["/"];
+  const baseMeta = META[pathname] ?? META["/"];
+  const { user } = useAuth();
+  const title =
+    pathname === "/" && user
+      ? `Welcome back, ${user.username} 👋`
+      : baseMeta.title;
+  const meta = { ...baseMeta, title };
 
   return (
     <header
@@ -146,25 +160,29 @@ export default function Header({ isMobile, onToggleSidebar }: HeaderProps) {
               border: "1.5px solid #fdf8e8",
             }}
           />
-        </button>
+                </button>
 
-        <div
-          style={{
-            width: 36,
-            height: 36,
-            borderRadius: 10,
-            background: "linear-gradient(135deg, #f5c842 0%, #e8a200 100%)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: 12,
-            fontWeight: 700,
-            color: "#1a1000",
-            boxShadow: "0 2px 10px rgba(245,200,66,0.35)",
-          }}
-        >
-          SG
-        </div>
+        {/* Avatar */}
+        <Link href="/profile">
+          <div
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: 10,
+              background: "linear-gradient(135deg, #f5c842 0%, #e8a200 100%)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 12,
+              fontWeight: 700,
+              color: "#1a1000",
+              boxShadow: "0 2px 10px rgba(245,200,66,0.35)",
+              textDecoration: "none",
+            }}
+          >
+            {user ? getInitial(user.username) : "?"}
+          </div>
+        </Link>
       </div>
     </header>
   );

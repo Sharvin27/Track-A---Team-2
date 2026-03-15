@@ -42,8 +42,8 @@ Backend
 - Node.js
 - Express
 
-Database (planned)
-- PostgreSQL / Supabase
+Database
+- PostgreSQL (used for user accounts; see Auth & Database below)
 
 Deployment
 - Vercel (frontend)
@@ -143,6 +143,44 @@ Backend runs at:
 
 http://localhost:5001
 
+
+---
+
+# Auth & Database
+
+User accounts are stored in **PostgreSQL**. Passwords are hashed with **bcrypt** (never stored in plain text). The backend uses **JWT** for session tokens.
+
+## Setup (local PostgreSQL)
+
+1. **PostgreSQL**: Create a database (e.g. `lemontree`) and set `DATABASE_URL` in the backend.
+
+2. **Backend env**: In `backend/`, copy `.env.example` to `.env` and set:
+   - `DATABASE_URL=postgresql://user:password@localhost:5432/lemontree`
+   - `JWT_SECRET` — use a long random string in production.
+
+3. **Frontend env** (optional): In `frontend/`, copy `.env.local.example` to `.env.local` and set `NEXT_PUBLIC_API_URL=http://localhost:5001` if your API runs elsewhere.
+
+4. **First run**: When the backend starts, it creates the `users` table if it does not exist.
+
+## Using Supabase
+
+1. **Create a project**: Go to [supabase.com](https://supabase.com) → New project → pick org, name, DB password, region.
+
+2. **Get the connection string**: In the Supabase dashboard → **Project Settings** (gear) → **Database** → under **Connection string** choose **URI**. Copy the URI and replace `[YOUR-PASSWORD]` with your database password.
+
+3. **Backend `.env`**: In `backend/`, set:
+   - `DATABASE_URL=<paste the Supabase connection string>`
+   - `JWT_SECRET=<a long random string>` (Supabase does not provide JWT for this app; we use our own.)
+
+4. **Start the backend**: Run `npm run dev` in `backend/`. The app will connect with SSL and create the `users` table in your Supabase database on first run.
+
+No code changes are required—only `DATABASE_URL` points to Supabase instead of local Postgres.
+
+## Security
+
+- Passwords are hashed with bcrypt (12 rounds) before storage.
+- Only the hash is stored; the API never returns `password_hash`.
+- JWT tokens are used for authenticated requests; set `JWT_SECRET` to a strong value in production.
 
 ---
 

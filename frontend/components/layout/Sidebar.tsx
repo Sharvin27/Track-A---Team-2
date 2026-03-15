@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
+import { useAuth } from "@/context/AuthContext";
 
 const NAV = [
   {
@@ -72,7 +73,7 @@ const NAV = [
     ),
   },
   {
-    href: "/onboarding",
+    href: "/getstarted",
     label: "Get Started",
     isNew: true,
     icon: (
@@ -91,9 +92,16 @@ interface SidebarProps {
   onClose: () => void;
 }
 
+function getInitial(name: string): string {
+  if (!name?.trim()) return "?";
+  const first = name.trim()[0];
+  return first.toUpperCase();
+}
+
 export default function Sidebar({ isMobile, isOpen, onClose }: SidebarProps) {
   const pathname = usePathname();
   const [hovered, setHovered] = useState<string | null>(null);
+  const { user, logout } = useAuth();
 
   return (
     <aside
@@ -325,7 +333,8 @@ export default function Sidebar({ isMobile, isOpen, onClose }: SidebarProps) {
       <div style={{ height: 1, background: "rgba(245,200,66,0.12)", margin: "10px 16px 12px" }} />
 
       <div style={{ padding: "0 10px 20px", position: "relative", zIndex: 1 }}>
-        <div
+        <Link
+          href={user?.isGuest ? "/" : "/profile"}
           style={{
             display: "flex",
             alignItems: "center",
@@ -333,6 +342,10 @@ export default function Sidebar({ isMobile, isOpen, onClose }: SidebarProps) {
             padding: "10px 12px",
             borderRadius: 11,
             background: "rgba(255,255,255,0.04)",
+            cursor: "pointer",
+            transition: "background 0.18s",
+            textDecoration: "none",
+            color: "inherit",
           }}
         >
           <div
@@ -350,7 +363,7 @@ export default function Sidebar({ isMobile, isOpen, onClose }: SidebarProps) {
               flexShrink: 0,
             }}
           >
-            SG
+            {user ? getInitial(user.username) : "?"}
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div
@@ -363,13 +376,48 @@ export default function Sidebar({ isMobile, isOpen, onClose }: SidebarProps) {
                 whiteSpace: "nowrap",
               }}
             >
-              Sharvin Gavad
+              {user ? user.username : "Guest"}
             </div>
             <div style={{ fontSize: 10.5, color: "rgba(237,229,204,0.38)", marginTop: 1 }}>
-              Hackathon 2025
+              {user?.isGuest ? "Guest" : user ? "Volunteer" : "Log in to get started"}
             </div>
           </div>
-        </div>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="rgba(237,229,204,0.35)" strokeWidth="2">
+            <circle cx="12" cy="5" r="1" /><circle cx="12" cy="12" r="1" /><circle cx="12" cy="19" r="1" />
+          </svg>
+        </Link>
+
+        {/* Guest CTA: switch to login/signup (effectively log guest out) */}
+        {user?.isGuest && (
+          <button
+            type="button"
+            onClick={() => logout()}
+            style={{
+              width: "100%",
+              marginTop: 10,
+              padding: "10px 12px",
+              borderRadius: 11,
+              border: "1px solid rgba(245,200,66,0.25)",
+              background: "rgba(245,200,66,0.08)",
+              color: "#f5c842",
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: "pointer",
+              transition: "background 0.18s, border-color 0.18s",
+              textAlign: "center",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "rgba(245,200,66,0.14)";
+              e.currentTarget.style.borderColor = "rgba(245,200,66,0.4)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "rgba(245,200,66,0.08)";
+              e.currentTarget.style.borderColor = "rgba(245,200,66,0.25)";
+            }}
+          >
+            Want to do more? Login or Sign up
+          </button>
+        )}
       </div>
     </aside>
   );
