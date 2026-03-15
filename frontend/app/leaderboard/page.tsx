@@ -28,7 +28,7 @@ type PodiumRow = {
   height: number;
   rank: number;
   pos: number;
-  profilePhotoUrl?: string | null;
+  profilePhotoUrl: string | null | undefined;
 };
 
 const STATIC_FALLBACK = [
@@ -203,7 +203,7 @@ export default function LeaderboardPage() {
     });
   }, [entries, user?.id]);
 
-  const podiumRows = useMemo<PodiumRow[]>(() => {
+  const podiumRows = useMemo(() => {
     const topThree = displayRows.slice(0, 3);
 
     return podiumSlots
@@ -224,7 +224,7 @@ export default function LeaderboardPage() {
           profilePhotoUrl: entry.profile_photo_url,
         };
       })
-      .filter((entry): entry is PodiumRow => Boolean(entry));
+      .filter((entry): entry is PodiumRow => entry !== null);
   }, [displayRows]);
 
   const yourStanding = useMemo(

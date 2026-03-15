@@ -10,7 +10,7 @@ import { useAuth } from "@/context/AuthContext";
 type NavItem = {
   href: string;
   label: string;
-  icon: JSX.Element;
+  icon: React.ReactNode;
   badge?: string;
   isNew?: boolean;
 };
