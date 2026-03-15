@@ -31,7 +31,7 @@ const statusStyle: Record<string, { bg: string; color: string }> = {
 export default function MapPage() {
   return (
     <PageContainer>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 300px", gap: 20 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 20 }}>
 
         {/* Map area */}
         <SectionCard

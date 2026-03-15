@@ -95,7 +95,7 @@ export default function HomePage() {
       </div>
 
       {/* ══ Stats Row ════════════════════════════════════════════════ */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 24 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16, marginBottom: 24 }}>
         {STATS.map((s, i) => (
           <div
             key={s.label}
@@ -122,7 +122,7 @@ export default function HomePage() {
       {/* ══ Quick Actions + Activity ═════════════════════════════════ */}
       <div
         className="anim-fade-up d5"
-        style={{ display: "grid", gridTemplateColumns: "3fr 2fr", gap: 20, marginBottom: 20 }}
+        style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 20, marginBottom: 20 }}
       >
         {/* Quick Actions */}
         <div style={{ ...card, padding: "24px" }}>
@@ -130,7 +130,7 @@ export default function HomePage() {
             Quick Actions
           </h3>
           <p style={{ fontSize: 12, color: "#9a8a60", marginTop: 3, marginBottom: 18 }}>Jump to what you need</p>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
             {QUICK.map((q) => (
               <HoverLink
                 key={q.href}
@@ -197,7 +197,7 @@ export default function HomePage() {
       <div
         className="anim-fade-up d6"
         style={{
-          display: "flex", alignItems: "center", justifyContent: "space-between",
+          display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 16,
           padding: "22px 32px", borderRadius: 18,
           background: "linear-gradient(120deg, #1a1200 55%, #2c1e00 100%)",
           border: "1px solid rgba(245,200,66,0.14)",

@@ -30,7 +30,7 @@ export default function LeaderboardPage() {
         {/* ── Row 1: 3D Podium + Sidebar ───────────────────────────── */}
         <div
           className="anim-fade-up d1"
-          style={{ display: "grid", gridTemplateColumns: "1fr 296px", gap: 20, marginBottom: 20 }}
+          style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 20, marginBottom: 20 }}
         >
           {/* 3D Podium — dark SectionCard with noPadding so canvas bleeds to edges */}
           <SectionCard
@@ -44,7 +44,7 @@ export default function LeaderboardPage() {
               padding: "20px 24px",
               background: "linear-gradient(to bottom, rgba(26,18,0,0.92) 0%, transparent 100%)",
             }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
                 <div>
                   <h3 style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 20, fontWeight: 700, color: "#f5c842", letterSpacing: "-0.4px" }}>
                     🏆 Champions Podium
@@ -69,7 +69,7 @@ export default function LeaderboardPage() {
               position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 10,
               padding: "16px 24px",
               background: "linear-gradient(to top, rgba(26,18,0,0.95) 0%, transparent 100%)",
-              display: "flex", justifyContent: "center", gap: 28,
+              display: "flex", justifyContent: "center", gap: 20, flexWrap: "wrap",
             }}>
               {[
                 { name: "Priya K.",  flyers: 820, color: "#f5c842", rank: "1st" },
@@ -140,7 +140,7 @@ export default function LeaderboardPage() {
           title="Full Rankings"
           subtitle="All 37 volunteers · Updated live"
           action={
-            <div style={{ display: "flex", gap: 6 }}>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
               {["All Time", "This Month", "This Week"].map((t, i) => (
                 <button
                   key={t}
@@ -159,20 +159,20 @@ export default function LeaderboardPage() {
           }
         >
           {/* Column headers */}
-          <div style={{
-            display: "grid",
-            gridTemplateColumns: "44px 1fr 200px 90px 70px 70px",
-            gap: 12, padding: "0 10px 10px",
-            borderBottom: "1px solid rgba(190,155,70,0.15)",
-          }}>
-            {["#", "Volunteer", "Progress", "Flyers", "Zones", "Hours"].map((h) => (
-              <span key={h} style={{ fontSize: 10.5, fontWeight: 600, color: "#9a8a60", letterSpacing: "0.06em", textTransform: "uppercase" }}>
-                {h}
-              </span>
-            ))}
-          </div>
-
-          <div style={{ marginTop: 6 }}>
+          <div style={{ marginTop: 6, overflowX: "auto" }}>
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: "44px minmax(180px, 1fr) 200px 90px 70px 70px",
+              gap: 12, padding: "0 10px 10px",
+              borderBottom: "1px solid rgba(190,155,70,0.15)",
+              minWidth: 640,
+            }}>
+              {["#", "Volunteer", "Progress", "Flyers", "Zones", "Hours"].map((h) => (
+                <span key={h} style={{ fontSize: 10.5, fontWeight: 600, color: "#9a8a60", letterSpacing: "0.06em", textTransform: "uppercase" }}>
+                  {h}
+                </span>
+              ))}
+            </div>
             {TOP.map((v, i) => {
               const pct = Math.round((v.flyers / MAX_FLYERS) * 100);
               return (
@@ -182,7 +182,7 @@ export default function LeaderboardPage() {
                   style={{
                     animationDelay: `${0.3 + i * 0.06}s`,
                     display: "grid",
-                    gridTemplateColumns: "44px 1fr 200px 90px 70px 70px",
+                    gridTemplateColumns: "44px minmax(180px, 1fr) 200px 90px 70px 70px",
                     gap: 12,
                     alignItems: "center",
                     padding: "10px 10px",
@@ -190,6 +190,7 @@ export default function LeaderboardPage() {
                     background: v.isYou ? "rgba(245,200,66,0.07)" : i % 2 === 0 ? "transparent" : "rgba(0,0,0,0.015)",
                     border: v.isYou ? "1.5px solid rgba(245,200,66,0.30)" : "1.5px solid transparent",
                     marginBottom: 3,
+                    minWidth: 640,
                   }}
                 >
                   {/* Rank */}

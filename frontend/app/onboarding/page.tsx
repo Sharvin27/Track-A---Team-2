@@ -51,7 +51,7 @@ export default function OnboardingPage() {
           position: "relative", borderRadius: 20, overflow: "hidden",
           background: "linear-gradient(130deg, #f5c842 0%, #fbbf24 60%, #f59e0b 100%)",
           boxShadow: "0 8px 32px rgba(245,200,66,0.35)",
-          padding: "48px 56px", textAlign: "center", marginBottom: 28,
+          padding: "clamp(28px, 6vw, 48px) clamp(20px, 6vw, 56px)", textAlign: "center", marginBottom: 28,
         }}
       >
         <div style={{ position: "absolute", top: -40, right: -40, width: 200, height: 200, borderRadius: "50%", background: "rgba(255,255,255,0.12)", pointerEvents: "none" }} />
@@ -69,7 +69,7 @@ export default function OnboardingPage() {
       {/* ── Steps ─────────────────────────────────────────────── */}
       <div
         className="anim-fade-up d2"
-        style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 24 }}
+        style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 16, marginBottom: 24 }}
       >
         {steps.map((s) => (
           <div
@@ -122,7 +122,7 @@ export default function OnboardingPage() {
         subtitle="Everything you need to know before you start"
         style={{ marginBottom: 24 }}
       >
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px 40px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "12px 24px" }}>
           {faqs.map((faq, i) => (
             <div key={i} style={{ padding: "14px 0", borderBottom: i < 2 ? "1px solid rgba(190,155,70,0.12)" : "none" }}>
               <p style={{ fontSize: 13.5, fontWeight: 600, color: "#1a1600", marginBottom: 5 }}>{faq.q}</p>
@@ -136,7 +136,7 @@ export default function OnboardingPage() {
       <div
         className="anim-fade-up d4"
         style={{
-          display: "flex", alignItems: "center", justifyContent: "space-between",
+          display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 16,
           padding: "22px 32px", borderRadius: 18,
           background: "linear-gradient(120deg, #1a1200 55%, #2c1e00 100%)",
           border: "1px solid rgba(245,200,66,0.14)",
