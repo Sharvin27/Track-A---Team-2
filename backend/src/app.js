@@ -1,6 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 const locationRoutes = require("./routes/locationRoutes");
+const sessionRoutes = require("./routes/sessionRoutes");
 const authRoutes = require("./routes/authRoutes");
 const { initDb } = require("./db");
 
@@ -14,6 +15,7 @@ app.get("/", (req, res) => {
 });
 
 app.use("/api/locations", locationRoutes);
+app.use("/api/sessions", sessionRoutes);
 app.use("/api/auth", authRoutes);
 
 initDb().catch((err) => console.error("DB init failed:", err));

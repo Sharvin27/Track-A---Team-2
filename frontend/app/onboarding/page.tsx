@@ -24,48 +24,6 @@ export default function OnboardingPage() {
   const [signPassword, setSignPassword] = useState("");
   const [signConfirm, setSignConfirm] = useState("");
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-    try {
-      await login(loginEmail, loginPassword);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Login failed");
-    }
-  };
-
-  const handleSignup = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-    if (signPassword !== signConfirm) {
-      setError("Passwords do not match.");
-      return;
-    }
-    if (signPassword.length < 8) {
-      setError("Password must be at least 8 characters.");
-      return;
-    }
-    try {
-      await signup(signUsername, signEmail, signPassword);
-      setStep("mission");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Signup failed");
-    }
-  };
-
-  const handleContinue = async () => {
-    if (!agree) {
-      setError("Please agree to the terms to continue.");
-      return;
-    }
-    setError("");
-    try {
-      await agreeToTerms();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong.");
-    }
-  };
-
   const cardStyle: React.CSSProperties = {
     background: "#ffffff",
     border: "1px solid rgba(190,155,70,0.18)",
@@ -120,11 +78,64 @@ export default function OnboardingPage() {
     marginTop: 8,
   };
 
+  async function handleLogin(event: React.FormEvent) {
+    event.preventDefault();
+    setError("");
+
+    try {
+      await login(loginEmail, loginPassword);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Login failed");
+    }
+  }
+
+  async function handleSignup(event: React.FormEvent) {
+    event.preventDefault();
+    setError("");
+
+    if (signPassword !== signConfirm) {
+      setError("Passwords do not match.");
+      return;
+    }
+
+    if (signPassword.length < 8) {
+      setError("Password must be at least 8 characters.");
+      return;
+    }
+
+    try {
+      await signup(signUsername, signEmail, signPassword);
+      setStep("mission");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Signup failed");
+    }
+  }
+
+  async function handleContinue() {
+    if (!agree) {
+      setError("Please agree to the terms to continue.");
+      return;
+    }
+
+    setError("");
+
+    try {
+      await agreeToTerms();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong.");
+    }
+  }
+
+  function resetToChoice() {
+    setStep("choice");
+    setError("");
+  }
+
   if (user && (user.agreed_to_terms || user.isGuest)) {
     return (
       <PageContainer>
         <div style={{ textAlign: "center", padding: 48 }}>
-          <p style={{ fontSize: 14, color: "#9a8a60" }}>Taking you to your dashboard…</p>
+          <p style={{ fontSize: 14, color: "#9a8a60" }}>Taking you to your dashboard...</p>
         </div>
       </PageContainer>
     );
@@ -146,8 +157,16 @@ export default function OnboardingPage() {
             marginBottom: 28,
           }}
         >
-          <div style={{ fontSize: 48, marginBottom: 12 }}>🍋</div>
-          <h2 style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 28, fontWeight: 700, color: "#1a1000", marginBottom: 8 }}>
+          <div style={{ fontSize: 48, marginBottom: 12 }}>L</div>
+          <h2
+            style={{
+              fontFamily: "'Fraunces', Georgia, serif",
+              fontSize: 28,
+              fontWeight: 700,
+              color: "#1a1000",
+              marginBottom: 8,
+            }}
+          >
             One more step
           </h2>
           <p style={{ fontSize: 14, color: "rgba(60,40,0,0.7)", maxWidth: 420, margin: "0 auto" }}>
@@ -156,24 +175,38 @@ export default function OnboardingPage() {
         </div>
 
         <div className="anim-fade-up d2" style={cardStyle}>
-          <h3 style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 18, fontWeight: 700, color: "#1a1600", marginBottom: 16 }}>
+          <h3
+            style={{
+              fontFamily: "'Fraunces', Georgia, serif",
+              fontSize: 18,
+              fontWeight: 700,
+              color: "#1a1600",
+              marginBottom: 16,
+            }}
+          >
             Our mission
           </h3>
-          <p style={{ fontSize: 14, color: "#5a4a20", lineHeight: 1.7, marginBottom: 24 }}>
-            {MISSION}
-          </p>
-          <label style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer", marginBottom: 20 }}>
+          <p style={{ fontSize: 14, color: "#5a4a20", lineHeight: 1.7, marginBottom: 24 }}>{MISSION}</p>
+          <label
+            style={{
+              display: "flex",
+              alignItems: "flex-start",
+              gap: 10,
+              cursor: "pointer",
+              marginBottom: 20,
+            }}
+          >
             <input
               type="checkbox"
               checked={agree}
-              onChange={(e) => setAgree(e.target.checked)}
+              onChange={(event) => setAgree(event.target.checked)}
               style={{ width: 18, height: 18, marginTop: 2, accentColor: "#f5c842" }}
             />
             <span style={{ fontSize: 13, color: "#5a4a20" }}>
               I agree to the terms of service and community guidelines.
             </span>
           </label>
-          {error && <p style={{ fontSize: 13, color: "#dc2626", marginBottom: 12 }}>{error}</p>}
+          {error ? <p style={{ fontSize: 13, color: "#dc2626", marginBottom: 12 }}>{error}</p> : null}
           <button type="button" style={buttonPrimary} onClick={handleContinue}>
             Continue to dashboard
           </button>
@@ -186,7 +219,14 @@ export default function OnboardingPage() {
     return (
       <PageContainer>
         <div className="anim-fade-up d1" style={{ textAlign: "center", marginBottom: 24 }}>
-          <h2 style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 26, fontWeight: 700, color: "#1a1000" }}>
+          <h2
+            style={{
+              fontFamily: "'Fraunces', Georgia, serif",
+              fontSize: 26,
+              fontWeight: 700,
+              color: "#1a1000",
+            }}
+          >
             Log in
           </h2>
           <p style={{ fontSize: 14, color: "#9a8a60", marginTop: 6 }}>Welcome back to Lemontree.</p>
@@ -197,7 +237,7 @@ export default function OnboardingPage() {
             <input
               type="email"
               value={loginEmail}
-              onChange={(e) => setLoginEmail(e.target.value)}
+              onChange={(event) => setLoginEmail(event.target.value)}
               style={inputStyle}
               placeholder="you@example.com"
               required
@@ -207,17 +247,17 @@ export default function OnboardingPage() {
             <input
               type="password"
               value={loginPassword}
-              onChange={(e) => setLoginPassword(e.target.value)}
+              onChange={(event) => setLoginPassword(event.target.value)}
               style={inputStyle}
-              placeholder="••••••••"
+              placeholder="Enter your password"
               required
               autoComplete="current-password"
             />
-            {error && <p style={{ fontSize: 13, color: "#dc2626", marginBottom: 12 }}>{error}</p>}
+            {error ? <p style={{ fontSize: 13, color: "#dc2626", marginBottom: 12 }}>{error}</p> : null}
             <button type="submit" style={buttonPrimary}>
               Log in
             </button>
-            <button type="button" style={buttonSecondary} onClick={() => { setStep("choice"); setError(""); }}>
+            <button type="button" style={buttonSecondary} onClick={resetToChoice}>
               Back
             </button>
           </form>
@@ -230,7 +270,14 @@ export default function OnboardingPage() {
     return (
       <PageContainer>
         <div className="anim-fade-up d1" style={{ textAlign: "center", marginBottom: 24 }}>
-          <h2 style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 26, fontWeight: 700, color: "#1a1000" }}>
+          <h2
+            style={{
+              fontFamily: "'Fraunces', Georgia, serif",
+              fontSize: 26,
+              fontWeight: 700,
+              color: "#1a1000",
+            }}
+          >
             Create an account
           </h2>
           <p style={{ fontSize: 14, color: "#9a8a60", marginTop: 6 }}>Join the Lemontree volunteer community.</p>
@@ -241,7 +288,7 @@ export default function OnboardingPage() {
             <input
               type="text"
               value={signUsername}
-              onChange={(e) => setSignUsername(e.target.value)}
+              onChange={(event) => setSignUsername(event.target.value)}
               style={inputStyle}
               placeholder="johndoe"
               required
@@ -251,7 +298,7 @@ export default function OnboardingPage() {
             <input
               type="email"
               value={signEmail}
-              onChange={(e) => setSignEmail(e.target.value)}
+              onChange={(event) => setSignEmail(event.target.value)}
               style={inputStyle}
               placeholder="you@example.com"
               required
@@ -261,7 +308,7 @@ export default function OnboardingPage() {
             <input
               type="password"
               value={signPassword}
-              onChange={(e) => setSignPassword(e.target.value)}
+              onChange={(event) => setSignPassword(event.target.value)}
               style={inputStyle}
               placeholder="At least 8 characters"
               required
@@ -272,17 +319,17 @@ export default function OnboardingPage() {
             <input
               type="password"
               value={signConfirm}
-              onChange={(e) => setSignConfirm(e.target.value)}
+              onChange={(event) => setSignConfirm(event.target.value)}
               style={inputStyle}
-              placeholder="••••••••"
+              placeholder="Confirm your password"
               required
               autoComplete="new-password"
             />
-            {error && <p style={{ fontSize: 13, color: "#dc2626", marginBottom: 12 }}>{error}</p>}
+            {error ? <p style={{ fontSize: 13, color: "#dc2626", marginBottom: 12 }}>{error}</p> : null}
             <button type="submit" style={buttonPrimary}>
               Sign up
             </button>
-            <button type="button" style={buttonSecondary} onClick={() => { setStep("choice"); setError(""); }}>
+            <button type="button" style={buttonSecondary} onClick={resetToChoice}>
               Back
             </button>
           </form>
@@ -306,69 +353,111 @@ export default function OnboardingPage() {
           marginBottom: 28,
         }}
       >
-        <div style={{ fontSize: 52, marginBottom: 14 }}>🍋</div>
-        <h2 style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 34, fontWeight: 700, color: "#1a1000", letterSpacing: "-0.8px", marginBottom: 10 }}>
+        <div style={{ fontSize: 52, marginBottom: 14 }}>L</div>
+        <h2
+          style={{
+            fontFamily: "'Fraunces', Georgia, serif",
+            fontSize: 34,
+            fontWeight: 700,
+            color: "#1a1000",
+            letterSpacing: "-0.8px",
+            marginBottom: 10,
+          }}
+        >
           Welcome to the Hub
         </h2>
-        <p style={{ fontSize: 14.5, color: "rgba(60,40,0,0.65)", maxWidth: 480, margin: "0 auto 28px" }}>
-          Get started by logging in or creating an account.
+        <p style={{ fontSize: 14.5, color: "rgba(60,40,0,0.65)", maxWidth: 520, margin: "0 auto" }}>
+          Choose how you want to start. Create an account to volunteer and track your impact, log in if you
+          already have one, or continue as a guest to explore first.
         </p>
-        <div style={{ display: "flex", gap: 16, justifyContent: "center", flexWrap: "wrap" }}>
-          <button
-            type="button"
-            onClick={() => setStep("login")}
-            style={{
-              padding: "14px 28px",
-              borderRadius: 12,
-              border: "none",
-              background: "rgba(18,12,0,0.84)",
-              color: "#f5c842",
-              fontSize: 14,
-              fontWeight: 700,
-              cursor: "pointer",
-              boxShadow: "0 3px 12px rgba(0,0,0,0.22)",
-            }}
-          >
-            Log in
-          </button>
-          <button
-            type="button"
-            onClick={() => setStep("signup")}
-            style={{
-              padding: "14px 28px",
-              borderRadius: 12,
-              border: "2px solid rgba(18,12,0,0.5)",
-              background: "rgba(255,255,255,0.9)",
-              color: "#1a1000",
-              fontSize: 14,
-              fontWeight: 700,
-              cursor: "pointer",
-            }}
-          >
-            Sign up
-          </button>
-          <button
-            type="button"
-            onClick={signInAsGuest}
-            style={{
-              padding: "14px 28px",
-              borderRadius: 12,
-              border: "1.5px solid rgba(190,155,70,0.4)",
-              background: "transparent",
-              color: "#5a4a20",
-              fontSize: 14,
-              fontWeight: 600,
-              cursor: "pointer",
-            }}
-          >
-            Continue as guest
-          </button>
-        </div>
       </div>
 
-      <div className="anim-fade-up d2" style={{ textAlign: "center" }}>
+      <div
+        className="anim-fade-up d2"
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+          gap: 16,
+          marginBottom: 24,
+        }}
+      >
+        <button
+          type="button"
+          onClick={() => {
+            setStep("signup");
+            setError("");
+          }}
+          style={{
+            ...cardStyle,
+            maxWidth: "none",
+            margin: 0,
+            textAlign: "left",
+            cursor: "pointer",
+          }}
+        >
+          <div style={{ fontSize: 24, marginBottom: 12 }}>Create</div>
+          <h3 style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 20, color: "#1a1600", marginBottom: 8 }}>
+            Sign up
+          </h3>
+          <p style={{ fontSize: 13.5, color: "#5a4a20", lineHeight: 1.6 }}>
+            Join the volunteer network, complete onboarding, and start tracking your outreach.
+          </p>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setStep("login");
+            setError("");
+          }}
+          style={{
+            ...cardStyle,
+            maxWidth: "none",
+            margin: 0,
+            textAlign: "left",
+            cursor: "pointer",
+          }}
+        >
+          <div style={{ fontSize: 24, marginBottom: 12 }}>Return</div>
+          <h3 style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 20, color: "#1a1600", marginBottom: 8 }}>
+            Log in
+          </h3>
+          <p style={{ fontSize: 13.5, color: "#5a4a20", lineHeight: 1.6 }}>
+            Pick up where you left off and continue volunteering with your existing account.
+          </p>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setError("");
+            signInAsGuest();
+          }}
+          style={{
+            ...cardStyle,
+            maxWidth: "none",
+            margin: 0,
+            textAlign: "left",
+            cursor: "pointer",
+          }}
+        >
+          <div style={{ fontSize: 24, marginBottom: 12 }}>Explore</div>
+          <h3 style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 20, color: "#1a1600", marginBottom: 8 }}>
+            Continue as guest
+          </h3>
+          <p style={{ fontSize: 13.5, color: "#5a4a20", lineHeight: 1.6 }}>
+            Browse the app first. You can create an account later when you are ready to do more.
+          </p>
+        </button>
+      </div>
+
+      <div className="anim-fade-up d3" style={{ textAlign: "center" }}>
         <p style={{ fontSize: 13, color: "#9a8a60" }}>
-          New here? <Link href="/onboarding" style={{ color: "#d97706", fontWeight: 600 }} onClick={(e) => { e.preventDefault(); setStep("signup"); }}>Sign up</Link> to volunteer and track your impact.
+          Looking for more information first? Visit the{" "}
+          <Link href="/getstarted" style={{ color: "#d97706", fontWeight: 600 }}>
+            getting started guide
+          </Link>
+          .
         </p>
       </div>
     </PageContainer>

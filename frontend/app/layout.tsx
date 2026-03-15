@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import "mapbox-gl/dist/mapbox-gl.css";
 import "./globals.css";
 import AppShell from "@/components/layout/AppShell";
 import { AuthProvider } from "@/context/AuthContext";
@@ -26,4 +27,3 @@ export default function RootLayout({
     </html>
   );
 }
- 

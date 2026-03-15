@@ -67,7 +67,7 @@ export default function ProfilePage() {
 
   return (
     <PageContainer>
-      <div style={{ display: "grid", gridTemplateColumns: "260px 1fr", gap: 20 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 20 }}>
 
         {/* ── Left column ──────────────────────────────────────── */}
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -126,7 +126,7 @@ export default function ProfilePage() {
 
           {/* Badges */}
           <SectionCard title="Badges">
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(72px, 1fr))", gap: 8 }}>
               {badges.map((b) => (
                 <div
                   key={b.label}
@@ -150,7 +150,7 @@ export default function ProfilePage() {
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
 
           {/* Stats row */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 14 }}>
             {stats.map((s) => (
               <StatCard key={s.label} label={s.label} value={s.value} icon={s.icon} iconBg={s.iconBg} />
             ))}
