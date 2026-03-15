@@ -19,6 +19,7 @@ export default function OnboardingPage() {
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
 
+  const [signFullName, setSignFullName] = useState("");
   const [signUsername, setSignUsername] = useState("");
   const [signEmail, setSignEmail] = useState("");
   const [signPassword, setSignPassword] = useState("");
@@ -104,7 +105,7 @@ export default function OnboardingPage() {
     }
 
     try {
-      await signup(signUsername, signEmail, signPassword);
+      await signup(signFullName, signUsername, signEmail, signPassword);
       setStep("mission");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Signup failed");
@@ -157,7 +158,16 @@ export default function OnboardingPage() {
             marginBottom: 28,
           }}
         >
-          <div style={{ fontSize: 48, marginBottom: 12 }}>L</div>
+          <div
+            style={{
+              fontSize: 48,
+              marginBottom: 12,
+              lineHeight: 1,
+              filter: "drop-shadow(0 0 16px rgba(255,255,255,0.6)) drop-shadow(0 0 32px rgba(245,200,66,0.45))",
+            }}
+          >
+            🍋
+          </div>
           <h2
             style={{
               fontFamily: "'Fraunces', Georgia, serif",
@@ -284,6 +294,15 @@ export default function OnboardingPage() {
         </div>
         <div className="anim-fade-up d2" style={cardStyle}>
           <form onSubmit={handleSignup}>
+            <label style={labelStyle}>Full name</label>
+            <input
+              type="text"
+              value={signFullName}
+              onChange={(event) => setSignFullName(event.target.value)}
+              style={inputStyle}
+              placeholder="Jane Doe"
+              autoComplete="name"
+            />
             <label style={labelStyle}>Username</label>
             <input
               type="text"
@@ -338,6 +357,19 @@ export default function OnboardingPage() {
     );
   }
 
+  const choiceButtonBase = {
+    padding: "20px 24px",
+    borderRadius: 16,
+    border: "none",
+    textAlign: "left" as const,
+    cursor: "pointer",
+    minWidth: 200,
+    flex: "1 1 200px",
+    maxWidth: 280,
+    boxShadow: "0 4px 20px rgba(0,0,0,0.12), 0 0 32px rgba(255,255,255,0.15)",
+    transition: "transform 0.2s ease, box-shadow 0.2s ease",
+  };
+
   return (
     <PageContainer>
       <div
@@ -353,7 +385,16 @@ export default function OnboardingPage() {
           marginBottom: 28,
         }}
       >
-        <div style={{ fontSize: 52, marginBottom: 14 }}>L</div>
+        <div
+          style={{
+            fontSize: 52,
+            marginBottom: 14,
+            lineHeight: 1,
+            filter: "drop-shadow(0 0 20px rgba(255,255,255,0.7)) drop-shadow(0 0 40px rgba(245,200,66,0.5))",
+          }}
+        >
+          🍋
+        </div>
         <h2
           style={{
             fontFamily: "'Fraunces', Georgia, serif",
@@ -367,43 +408,23 @@ export default function OnboardingPage() {
           Welcome to the Hub
         </h2>
         <p style={{ fontSize: 14.5, color: "rgba(60,40,0,0.65)", maxWidth: 520, margin: "0 auto" }}>
-          Choose how you want to start. Create an account to volunteer and track your impact, log in if you
-          already have one, or continue as a guest to explore first.
+          Choose how you want to start. Log in, create an account, or explore as a guest.
         </p>
       </div>
 
       <div
         className="anim-fade-up d2"
         style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-          gap: 16,
+          display: "flex",
+          flexDirection: "row",
+          flexWrap: "wrap",
+          justifyContent: "center",
+          alignItems: "stretch",
+          gap: 18,
           marginBottom: 24,
+          padding: "0 16px",
         }}
       >
-        <button
-          type="button"
-          onClick={() => {
-            setStep("signup");
-            setError("");
-          }}
-          style={{
-            ...cardStyle,
-            maxWidth: "none",
-            margin: 0,
-            textAlign: "left",
-            cursor: "pointer",
-          }}
-        >
-          <div style={{ fontSize: 24, marginBottom: 12 }}>Create</div>
-          <h3 style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 20, color: "#1a1600", marginBottom: 8 }}>
-            Sign up
-          </h3>
-          <p style={{ fontSize: 13.5, color: "#5a4a20", lineHeight: 1.6 }}>
-            Join the volunteer network, complete onboarding, and start tracking your outreach.
-          </p>
-        </button>
-
         <button
           type="button"
           onClick={() => {
@@ -411,20 +432,23 @@ export default function OnboardingPage() {
             setError("");
           }}
           style={{
-            ...cardStyle,
-            maxWidth: "none",
-            margin: 0,
-            textAlign: "left",
-            cursor: "pointer",
+            ...choiceButtonBase,
+            background: "linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)",
+            color: "#fff",
+            boxShadow: "0 4px 20px rgba(0,0,0,0.12), 0 0 28px rgba(59,130,246,0.35)",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = "translateY(-2px)";
+            e.currentTarget.style.boxShadow = "0 8px 28px rgba(59,130,246,0.5), 0 0 40px rgba(59,130,246,0.25)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = "translateY(0)";
+            e.currentTarget.style.boxShadow = "0 4px 20px rgba(0,0,0,0.12), 0 0 28px rgba(59,130,246,0.35)";
           }}
         >
-          <div style={{ fontSize: 24, marginBottom: 12 }}>Return</div>
-          <h3 style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 20, color: "#1a1600", marginBottom: 8 }}>
-            Log in
-          </h3>
-          <p style={{ fontSize: 13.5, color: "#5a4a20", lineHeight: 1.6 }}>
-            Pick up where you left off and continue volunteering with your existing account.
-          </p>
+          <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.06em", color: "rgba(255,255,255,0.9)" }}>RETURNING?</span>
+          <h3 style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 20, color: "#fff", margin: "6px 0 4px" }}>Log in</h3>
+          <p style={{ fontSize: 13, color: "rgba(255,255,255,0.85)", lineHeight: 1.4 }}>Use your existing account.</p>
         </button>
 
         <button
@@ -434,20 +458,49 @@ export default function OnboardingPage() {
             signInAsGuest();
           }}
           style={{
-            ...cardStyle,
-            maxWidth: "none",
-            margin: 0,
-            textAlign: "left",
-            cursor: "pointer",
+            ...choiceButtonBase,
+            background: "linear-gradient(135deg, #f5c842 0%, #e8a200 100%)",
+            color: "#1a1000",
+            boxShadow: "0 4px 20px rgba(0,0,0,0.12), 0 0 28px rgba(245,200,66,0.4)",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = "translateY(-2px)";
+            e.currentTarget.style.boxShadow = "0 8px 28px rgba(245,200,66,0.55), 0 0 44px rgba(245,200,66,0.3)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = "translateY(0)";
+            e.currentTarget.style.boxShadow = "0 4px 20px rgba(0,0,0,0.12), 0 0 28px rgba(245,200,66,0.4)";
           }}
         >
-          <div style={{ fontSize: 24, marginBottom: 12 }}>Explore</div>
-          <h3 style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 20, color: "#1a1600", marginBottom: 8 }}>
-            Continue as guest
-          </h3>
-          <p style={{ fontSize: 13.5, color: "#5a4a20", lineHeight: 1.6 }}>
-            Browse the app first. You can create an account later when you are ready to do more.
-          </p>
+          <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.06em", color: "rgba(26,16,0,0.7)" }}>EXPLORE</span>
+          <h3 style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 20, color: "#1a1000", margin: "6px 0 4px" }}>Continue as guest</h3>
+          <p style={{ fontSize: 13, color: "rgba(26,16,0,0.75)", lineHeight: 1.4 }}>Browse first. Create an account later.</p>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setStep("signup");
+            setError("");
+          }}
+          style={{
+            ...choiceButtonBase,
+            background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+            color: "#fff",
+            boxShadow: "0 4px 20px rgba(0,0,0,0.12), 0 0 28px rgba(16,185,129,0.35)",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = "translateY(-2px)";
+            e.currentTarget.style.boxShadow = "0 8px 28px rgba(16,185,129,0.5), 0 0 40px rgba(16,185,129,0.25)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = "translateY(0)";
+            e.currentTarget.style.boxShadow = "0 4px 20px rgba(0,0,0,0.12), 0 0 28px rgba(16,185,129,0.35)";
+          }}
+        >
+          <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.06em", color: "rgba(255,255,255,0.9)" }}>NEW HERE?</span>
+          <h3 style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 20, color: "#fff", margin: "6px 0 4px" }}>Sign up</h3>
+          <p style={{ fontSize: 13, color: "rgba(255,255,255,0.85)", lineHeight: 1.4 }}>Join and track your impact.</p>
         </button>
       </div>
 

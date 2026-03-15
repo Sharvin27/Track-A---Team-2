@@ -10,6 +10,7 @@ interface SessionShareModalProps {
   isOpen: boolean;
   session: VolunteerSession | null;
   onClose: () => void;
+  isGuest?: boolean;
 }
 
 type ShareState = "idle" | "sharing" | "shared" | "copied" | "downloaded" | "error";
@@ -18,6 +19,7 @@ export default function SessionShareModal({
   isOpen,
   session,
   onClose,
+  isGuest = false,
 }: SessionShareModalProps) {
   const [shareState, setShareState] = useState<ShareState>("idle");
   const [shareError, setShareError] = useState<string | null>(null);
@@ -133,6 +135,9 @@ export default function SessionShareModal({
         style={{
           width: "100%",
           maxWidth: 360,
+          display: "flex",
+          flexDirection: "column",
+          gap: 0,
           borderRadius: 24,
           overflow: "hidden",
           background: "linear-gradient(180deg, #fffef9 0%, #fff8e8 100%)",
@@ -209,6 +214,21 @@ export default function SessionShareModal({
             Quick actions for the share sheet, copy, and save.
           </p>
         </div>
+
+        {isGuest ? (
+          <div
+            style={{
+              padding: "10px 14px",
+              background: "rgba(245,200,66,0.2)",
+              borderBottom: "1px solid rgba(190,155,70,0.2)",
+              fontSize: 12,
+              color: "#5a4a20",
+              textAlign: "center",
+            }}
+          >
+            This session wasn’t saved. Create an account to save future sessions to your profile.
+          </div>
+        ) : null}
 
         <div style={{ padding: 14, display: "grid", gap: 12 }}>
           <div

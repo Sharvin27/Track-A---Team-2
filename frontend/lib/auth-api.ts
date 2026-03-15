@@ -7,6 +7,7 @@ export type User = {
   id: number;
   username: string;
   email: string;
+  full_name?: string | null;
   agreed_to_terms: boolean;
   created_at: string;
   profile_photo_url?: string | null;
@@ -14,6 +15,7 @@ export type User = {
 };
 
 export async function signup(
+  fullName: string,
   username: string,
   email: string,
   password: string
@@ -21,7 +23,7 @@ export async function signup(
   const res = await fetch(`${API_BASE}/api/auth/signup`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username, email, password }),
+    body: JSON.stringify({ full_name: fullName.trim(), username, email, password }),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || "Signup failed");

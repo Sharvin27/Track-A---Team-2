@@ -56,8 +56,11 @@ async function initDb() {
         email VARCHAR(255) UNIQUE NOT NULL,
         password_hash VARCHAR(255) NOT NULL,
         agreed_to_terms BOOLEAN DEFAULT FALSE,
-        created_at TIMESTAMPTZ DEFAULT NOW()
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        full_name TEXT DEFAULT ''
       );
+
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS full_name TEXT DEFAULT '';
 
       CREATE TABLE IF NOT EXISTS need_regions (
         id BIGSERIAL PRIMARY KEY,
@@ -159,6 +162,24 @@ async function initDb() {
       BEFORE UPDATE ON profile_photos
       FOR EACH ROW
       EXECUTE FUNCTION set_updated_at_timestamp();
+
+      CREATE TABLE IF NOT EXISTS user_stats (
+        id INT PRIMARY KEY REFERENCES users(id) ON UPDATE CASCADE ON DELETE CASCADE,
+        flyers BIGINT NOT NULL DEFAULT 0,
+        hours DOUBLE PRECISION NOT NULL DEFAULT 0,
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS user_daily_activity (
+        user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        date DATE NOT NULL,
+        flyers INT NOT NULL DEFAULT 0,
+        hours NUMERIC(10, 2) NOT NULL DEFAULT 0,
+        PRIMARY KEY (user_id, date)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_user_daily_activity_user_date
+        ON user_daily_activity (user_id, date DESC);
 
       CREATE INDEX IF NOT EXISTS idx_hotspot_locations_lat_lng ON hotspot_locations (lat, lng);
       CREATE INDEX IF NOT EXISTS idx_hotspot_locations_category ON hotspot_locations (category);
