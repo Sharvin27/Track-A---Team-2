@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Header from "./Header";
 import Sidebar from "./Sidebar";
+import ChatbotWidget from "../chat/ChatbotWidget";
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const [isMobile, setIsMobile] = useState(false);
@@ -124,6 +125,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           {children}
         </main>
       </div>
+      <ChatbotWidget />
     </div>
   );
 }
