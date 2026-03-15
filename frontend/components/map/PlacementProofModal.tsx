@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useEffectEvent, useMemo, useState } from "react";
 import type { CSSProperties, FormEvent } from "react";
 import SubmissionResultCard from "@/components/map/SubmissionResultCard";
 import { useAuth } from "@/context/AuthContext";
@@ -45,37 +45,14 @@ export default function PlacementProofModal({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [result, setResult] = useState<PlacementSubmissionResult | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const targetId = target?.id ?? null;
 
   const heading = useMemo(() => {
     if (!target) return "Upload placement proof";
     return `Verify ${target.name}`;
   }, [target]);
 
-  useEffect(() => {
-    if (!open || !target) {
-      resetModalState();
-      return;
-    }
-
-    setModalState("locating");
-    void requestLocation();
-  }, [open, target?.id]);
-
-  useEffect(() => {
-    if (!selectedFile) {
-      setPreviewUrl(null);
-      return;
-    }
-
-    const objectUrl = URL.createObjectURL(selectedFile);
-    setPreviewUrl(objectUrl);
-
-    return () => {
-      URL.revokeObjectURL(objectUrl);
-    };
-  }, [selectedFile]);
-
-  async function requestLocation() {
+  const requestLocation = useEffectEvent(async () => {
     try {
       const position = await getCurrentPositionPromise();
       setCapturedPosition({
@@ -98,7 +75,31 @@ export default function PlacementProofModal({
     } finally {
       setModalState("ready");
     }
-  }
+  });
+
+  useEffect(() => {
+    if (!open || !targetId) {
+      resetModalState();
+      return;
+    }
+
+    setModalState("locating");
+    void requestLocation();
+  }, [open, targetId]);
+
+  useEffect(() => {
+    if (!selectedFile) {
+      setPreviewUrl(null);
+      return;
+    }
+
+    const objectUrl = URL.createObjectURL(selectedFile);
+    setPreviewUrl(objectUrl);
+
+    return () => {
+      URL.revokeObjectURL(objectUrl);
+    };
+  }, [selectedFile]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -267,17 +268,20 @@ export default function PlacementProofModal({
             </label>
 
             {previewUrl ? (
-              <img
-                src={previewUrl}
-                alt="Proof preview"
-                style={{
-                  width: "100%",
-                  maxHeight: 280,
-                  objectFit: "cover",
-                  borderRadius: 18,
-                  border: "1px solid rgba(148,163,184,0.20)",
-                }}
-              />
+              <>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={previewUrl}
+                  alt="Proof preview"
+                  style={{
+                    width: "100%",
+                    maxHeight: 280,
+                    objectFit: "cover",
+                    borderRadius: 18,
+                    border: "1px solid rgba(148,163,184,0.20)",
+                  }}
+                />
+              </>
             ) : (
               <div style={emptyPreviewStyle}>
                 Capture or upload a flyer photo to continue.

@@ -67,7 +67,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(GUEST_USER);
     }
     setLoading(false);
-  }, []);
+  }, [setToken]);
 
   useEffect(() => {
     loadUser();
@@ -98,7 +98,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(GUEST_USER);
     if (typeof window !== "undefined") localStorage.setItem(GUEST_KEY, "1");
     router.push("/");
-  }, [router]);
+  }, [router, setToken]);
 
   const logout = useCallback(() => {
     setToken(null);

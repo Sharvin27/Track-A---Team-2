@@ -12,6 +12,9 @@ const ACCEPTED_MIME_TYPES = new Set([
 ]);
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
 const DUPLICATE_COOLDOWN_HOURS = 24;
+const VERIFIED_SCORE_THRESHOLD = 40;
+const PENDING_SCORE_THRESHOLD = 25;
+const VERIFIED_DISTANCE_THRESHOLD_METERS = 2000;
 const BASE_FLYER_KEYWORDS = [
   "lemontree",
   "foodhelpline.org",
@@ -100,14 +103,14 @@ async function verifyPlacementEvidence({
     reviewReason =
       "This exact image was already submitted for this hotspot recently. Please take a new photo.";
   } else if (
-    verificationScore >= 80 &&
+    verificationScore > VERIFIED_SCORE_THRESHOLD &&
     distanceMeters !== null &&
-    distanceMeters <= 75 &&
+    distanceMeters <= VERIFIED_DISTANCE_THRESHOLD_METERS &&
     (ocrScore > 0 || qrScore > 0)
   ) {
     status = "verified";
     reviewReason = "Placement evidence verified automatically.";
-  } else if (verificationScore >= 55) {
+  } else if (verificationScore >= PENDING_SCORE_THRESHOLD) {
     status = "pending_review";
     reviewReason = buildPendingReviewReason({
       gpsScore,
@@ -176,9 +179,14 @@ function scoreGpsDistance({ gpsLat, gpsLng, targetLat, targetLng }) {
   const distanceMeters = haversineDistanceMeters(gpsLat, gpsLng, targetLat, targetLng);
 
   if (distanceMeters <= 20) return { distanceMeters, gpsScore: 35 };
-  if (distanceMeters <= 50) return { distanceMeters, gpsScore: 28 };
-  if (distanceMeters <= 75) return { distanceMeters, gpsScore: 18 };
-  if (distanceMeters <= 100) return { distanceMeters, gpsScore: 8 };
+  if (distanceMeters <= 50) return { distanceMeters, gpsScore: 32 };
+  if (distanceMeters <= 75) return { distanceMeters, gpsScore: 24 };
+  if (distanceMeters <= 100) return { distanceMeters, gpsScore: 18 };
+  if (distanceMeters <= 150) return { distanceMeters, gpsScore: 12 };
+  if (distanceMeters <= 300) return { distanceMeters, gpsScore: 8 };
+  if (distanceMeters <= 500) return { distanceMeters, gpsScore: 6 };
+  if (distanceMeters <= 1000) return { distanceMeters, gpsScore: 4 };
+  if (distanceMeters <= 2000) return { distanceMeters, gpsScore: 2 };
 
   return {
     distanceMeters,
@@ -305,7 +313,7 @@ function buildPendingReviewReason({ gpsScore, ocrScore, qrScore, distanceMeters 
     return "Photo uploaded without GPS, so the submission needs manual review.";
   }
 
-  if (gpsScore < 18) {
+  if (gpsScore < 6) {
     return "Photo evidence was captured, but the submitted location is farther from the hotspot than expected.";
   }
 
@@ -336,7 +344,7 @@ function buildRejectedReason({
     return "The uploaded photo is too dark, blurry, or small to verify.";
   }
 
-  if (Number.isFinite(distanceMeters) && distanceMeters > 100) {
+  if (Number.isFinite(distanceMeters) && distanceMeters > 2000) {
     return "The submitted GPS location is too far from the hotspot.";
   }
 

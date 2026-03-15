@@ -1,4 +1,9 @@
 const { getPool, query } = require("../db");
+const sqliteDb = require("../db/database");
+const {
+  attachSummariesToHotspots,
+  getTargetSummary,
+} = require("../data/placementRepository");
 const {
   findNeedRegionForPointInRegions,
   getStoredNeedRegions,
@@ -169,9 +174,11 @@ async function getStoredHotspots({ lat, lng, radiusMiles, limit = 5000 }) {
     FROM hotspot_locations
     ORDER BY score DESC, imported_at DESC, name ASC
   `);
+  const sourceRows =
+    result.rows.length > 0 ? result.rows : getSqliteHotspotRows();
 
   const allRows = dedupeHotspots(
-    result.rows
+    sourceRows
       .map(normalizeRow)
       .filter((row) => Boolean(row) && Boolean(CATEGORY_SCORES[row.category])),
     0.08,
@@ -193,6 +200,49 @@ async function getStoredHotspots({ lat, lng, radiusMiles, limit = 5000 }) {
   }
 
   return allRows.slice(0, limit);
+}
+
+async function getStoredHotspotsWithPlacementSummary(options = {}) {
+  const hotspots = await getStoredHotspots(options);
+  return attachSummariesToHotspots(hotspots);
+}
+
+async function getHotspotById(id) {
+  const result = await query(
+    `
+      SELECT *
+      FROM hotspot_locations
+      WHERE id = $1
+    `,
+    [id],
+  );
+  const postgresRow = result.rows[0];
+  if (postgresRow) {
+    return normalizeRow(postgresRow);
+  }
+
+  return normalizeRow(
+    sqliteDb
+      .prepare(
+        `
+          SELECT *
+          FROM hotspot_locations
+          WHERE id = ?
+        `,
+      )
+      .get(id),
+  );
+}
+
+async function getHotspotByIdWithPlacementSummary(id) {
+  const hotspot = await getHotspotById(id);
+  if (!hotspot) return null;
+
+  return {
+    ...hotspot,
+    placementTargetId: `hotspot:${hotspot.id}`,
+    ...getTargetSummary(`hotspot:${hotspot.id}`),
+  };
 }
 
 async function updateHotspotStatus(id, updates) {
@@ -241,7 +291,7 @@ async function updateHotspotStatus(id, updates) {
     [id],
   );
 
-  return normalizeRow(updatedResult.rows[0]);
+  return getHotspotByIdWithPlacementSummary(updatedResult.rows[0].id);
 }
 
 function buildOverpassQuery({ lat, lng, radiusMeters }) {
@@ -318,6 +368,18 @@ function normalizeRow(row) {
     importedAt:
       row.imported_at instanceof Date ? row.imported_at.toISOString() : row.imported_at,
   };
+}
+
+function getSqliteHotspotRows() {
+  return sqliteDb
+    .prepare(
+      `
+        SELECT *
+        FROM hotspot_locations
+        ORDER BY score DESC, imported_at DESC, name ASC
+      `,
+    )
+    .all();
 }
 
 function mapOsmElementToHotspot(element, importedAt, needRegions) {
@@ -512,5 +574,8 @@ function getDistanceMiles(fromLat, fromLng, toLat, toLng) {
 module.exports = {
   importHotspotsFromOsm,
   getStoredHotspots,
+  getStoredHotspotsWithPlacementSummary,
+  getHotspotById,
+  getHotspotByIdWithPlacementSummary,
   updateHotspotStatus,
 };

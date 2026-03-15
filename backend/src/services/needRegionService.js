@@ -1,4 +1,5 @@
 const { getPool, query } = require("../db");
+const sqliteDb = require("../db/database");
 
 const FOOD_NEED_DATASET_URL =
   "https://data.cityofnewyork.us/resource/4kc9-zrs2.json?%24limit=1000&%24order=year%20DESC%2C%20weighted_score%20DESC";
@@ -42,8 +43,20 @@ async function getStoredNeedRegions() {
     FROM need_regions
     ORDER BY food_insecure_percentage DESC NULLS LAST, food_need_score DESC, region_name ASC
   `);
+  const sourceRows =
+    result.rows.length > 0
+      ? result.rows
+      : sqliteDb
+          .prepare(
+            `
+              SELECT *
+              FROM need_regions
+              ORDER BY food_insecure_percentage DESC, food_need_score DESC, region_name ASC
+            `,
+          )
+          .all();
 
-  return result.rows.map(normalizeRegionRow);
+  return sourceRows.map(normalizeRegionRow);
 }
 
 async function importNeedRegionsFromNycOpenData() {

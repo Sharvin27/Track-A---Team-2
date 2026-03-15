@@ -61,16 +61,16 @@ function placementUploadMiddleware(req, res, next) {
   });
 }
 
-function getAllPlacementTargets() {
+async function getAllPlacementTargets() {
   return listTargets();
 }
 
-function getPlacementTargetById(id) {
+async function getPlacementTargetById(id) {
   return requireTarget(id);
 }
 
-function getPlacementSubmissionsForTarget(id) {
-  requireTarget(id);
+async function getPlacementSubmissionsForTarget(id) {
+  await requireTarget(id);
   return listSubmissionsForTarget(id);
 }
 
@@ -82,7 +82,7 @@ async function submitPlacementSubmission({ body, file }) {
   ensureUploadDirectories();
 
   const normalizedTargetId = normalizeTargetId(body.targetId, body.hotspotId);
-  const target = requireTarget(normalizedTargetId);
+  const target = await requireTarget(normalizedTargetId);
   const verification = await verifyPlacementEvidence({
     file,
     target,

@@ -5,10 +5,9 @@ const {
   getHotspotByIdWithPlacementSummary,
 } = require("./osmHotspotService");
 
-function listTargets() {
-  const hotspotTargets = getStoredHotspotsWithPlacementSummary({ limit: 15000 }).map(
-    mapHotspotToTarget,
-  );
+async function listTargets() {
+  const hotspots = await getStoredHotspotsWithPlacementSummary({ limit: 15000 });
+  const hotspotTargets = hotspots.map(mapHotspotToTarget);
   const hotspotTargetIds = new Set(hotspotTargets.map((target) => target.id));
   const staticTargets = fallbackTargets
     .filter((target) => !hotspotTargetIds.has(target.id))
@@ -17,12 +16,12 @@ function listTargets() {
   return [...hotspotTargets, ...staticTargets];
 }
 
-function findTargetById(id) {
+async function findTargetById(id) {
   if (!id) return null;
 
   if (String(id).startsWith("hotspot:")) {
     const hotspotId = String(id).slice("hotspot:".length);
-    const hotspot = getHotspotByIdWithPlacementSummary(hotspotId);
+    const hotspot = await getHotspotByIdWithPlacementSummary(hotspotId);
 
     if (!hotspot) return null;
     return mapHotspotToTarget(hotspot);
@@ -32,8 +31,8 @@ function findTargetById(id) {
   return fallbackTarget ? attachSummaryToTarget(fallbackTarget) : null;
 }
 
-function requireTarget(id) {
-  const target = findTargetById(id);
+async function requireTarget(id) {
+  const target = await findTargetById(id);
   if (target) return target;
 
   const error = new Error("Placement target not found.");

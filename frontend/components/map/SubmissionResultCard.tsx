@@ -88,17 +88,20 @@ export default function SubmissionResultCard({
       </div>
 
       {result.imageUrl ? (
-        <img
-          src={result.imageUrl}
-          alt="Submitted flyer proof"
-          style={{
-            width: "100%",
-            maxHeight: 220,
-            objectFit: "cover",
-            borderRadius: 14,
-            border: "1px solid rgba(148,163,184,0.20)",
-          }}
-        />
+        <>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={result.imageUrl}
+            alt="Submitted flyer proof"
+            style={{
+              width: "100%",
+              maxHeight: 220,
+              objectFit: "cover",
+              borderRadius: 14,
+              border: "1px solid rgba(148,163,184,0.20)",
+            }}
+          />
+        </>
       ) : null}
     </div>
   );

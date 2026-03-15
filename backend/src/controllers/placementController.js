@@ -6,9 +6,9 @@ const {
   submitPlacementSubmission,
 } = require("../services/placementService");
 
-function listPlacementTargets(req, res) {
+async function listPlacementTargets(req, res) {
   try {
-    const targets = getAllPlacementTargets();
+    const targets = await getAllPlacementTargets();
 
     res.status(200).json({
       success: true,
@@ -20,9 +20,9 @@ function listPlacementTargets(req, res) {
   }
 }
 
-function getPlacementTarget(req, res) {
+async function getPlacementTarget(req, res) {
   try {
-    const target = getPlacementTargetById(req.params.id);
+    const target = await getPlacementTargetById(req.params.id);
 
     res.status(200).json({
       success: true,
@@ -33,9 +33,9 @@ function getPlacementTarget(req, res) {
   }
 }
 
-function listPlacementTargetSubmissions(req, res) {
+async function listPlacementTargetSubmissions(req, res) {
   try {
-    const submissions = getPlacementSubmissionsForTarget(req.params.id);
+    const submissions = await getPlacementSubmissionsForTarget(req.params.id);
 
     res.status(200).json({
       success: true,

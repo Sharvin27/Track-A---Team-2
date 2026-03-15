@@ -7,7 +7,6 @@ const sessionRoutes = require("./routes/sessionRoutes");
 const authRoutes = require("./routes/authRoutes");
 const placementRoutes = require("./routes/placementRoutes");
 const leaderboardRoutes = require("./routes/leaderboardRoutes");
-const { initDb } = require("./db");
 
 const app = express();
 
@@ -25,7 +24,5 @@ app.use("/api/sessions", sessionRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api", placementRoutes);
 app.use("/api/leaderboard", leaderboardRoutes);
-
-initDb().catch((err) => console.error("DB init failed:", err));
 
 module.exports = app;
