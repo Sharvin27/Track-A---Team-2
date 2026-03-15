@@ -1,256 +1,786 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import PageContainer from "@/components/layout/PageContainer";
 import SectionCard from "@/components/common/SectionCard";
 import PodiumCanvas from "@/components/leaderboard/PodiumCanvas";
+import GuestGate from "@/components/auth/GuestGate";
+import { useAuth } from "@/context/AuthContext";
+import { getLeaderboard, type LeaderboardEntry } from "@/lib/leaderboard-api";
 
-const TOP = [
-  { rank: 1, name: "Priya Kapoor", flyers: 820, zones: 14, hours: 68, badge: "🥇", avatar: "PK", color: "#f5c842",  isYou: false },
-  { rank: 2, name: "Marcus Webb",  flyers: 710, zones: 11, hours: 52, badge: "🥈", avatar: "MW", color: "#c0c0c0",  isYou: false },
-  { rank: 3, name: "Sofia Reyes",  flyers: 640, zones: 10, hours: 47, badge: "🥉", avatar: "SR", color: "#cd7f32",  isYou: false },
-  { rank: 4, name: "Jamie Diaz",   flyers: 340, zones: 8,  hours: 24, badge: null,  avatar: "JD", color: "#f5c842",  isYou: true  },
-  { rank: 5, name: "Leo Tran",     flyers: 310, zones: 7,  hours: 22, badge: null,  avatar: "LT", color: "#6b7280",  isYou: false },
-  { rank: 6, name: "Amara Osei",   flyers: 280, zones: 6,  hours: 19, badge: null,  avatar: "AO", color: "#6b7280",  isYou: false },
-  { rank: 7, name: "Ben Zhao",     flyers: 250, zones: 5,  hours: 17, badge: null,  avatar: "BZ", color: "#6b7280",  isYou: false },
-  { rank: 8, name: "Nadia Frost",  flyers: 200, zones: 4,  hours: 14, badge: null,  avatar: "NF", color: "#6b7280",  isYou: false },
+type DisplayRow = LeaderboardEntry & {
+  flyers: number;
+  zones: number;
+  badge: string | null;
+  avatar: string;
+  color: string;
+  isYou: boolean;
+  hoursLabel: string;
+  progressPercent: number;
+};
+
+type PodiumRow = {
+  name: string;
+  avatar: string;
+  flyers: number;
+  color: string;
+  height: number;
+  rank: number;
+  pos: number;
+  profilePhotoUrl: string | null | undefined;
+};
+
+const STATIC_FALLBACK = [
+  { flyers: 820, zones: 14, badge: "1", color: "#f5c842" },
+  { flyers: 710, zones: 11, badge: "2", color: "#c0c0c0" },
+  { flyers: 640, zones: 10, badge: "3", color: "#cd7f32" },
+  { flyers: 340, zones: 8, badge: null, color: "#f5c842" },
+  { flyers: 310, zones: 7, badge: null, color: "#6b7280" },
+  { flyers: 280, zones: 6, badge: null, color: "#6b7280" },
+  { flyers: 250, zones: 5, badge: null, color: "#6b7280" },
+  { flyers: 200, zones: 4, badge: null, color: "#6b7280" },
 ];
 
-const MAX_FLYERS = 820;
 const rankColors: Record<number, string> = { 1: "#f5c842", 2: "#9ca3af", 3: "#b45309" };
+const monthlyStatHighlights = [
+  {
+    background: "linear-gradient(135deg, rgba(254, 226, 226, 0.95), rgba(254, 242, 242, 0.92))",
+    shadow: "0 10px 24px rgba(239,68,68,0.14)",
+    pill: "#ef4444",
+  },
+  {
+    background: "linear-gradient(135deg, rgba(219, 234, 254, 0.95), rgba(239, 246, 255, 0.92))",
+    shadow: "0 10px 24px rgba(59,130,246,0.14)",
+    pill: "#2563eb",
+  },
+  {
+    background: "linear-gradient(135deg, rgba(220, 252, 231, 0.95), rgba(240, 253, 244, 0.92))",
+    shadow: "0 10px 24px rgba(34,197,94,0.14)",
+    pill: "#16a34a",
+  },
+  {
+    background: "linear-gradient(135deg, rgba(254, 249, 195, 0.95), rgba(255, 251, 235, 0.92))",
+    shadow: "0 10px 24px rgba(234,179,8,0.14)",
+    pill: "#ca8a04",
+  },
+];
 
 const monthlyStats = [
-  { label: "Total Flyers",      value: "4,554", icon: "📄" },
-  { label: "Active Volunteers", value: "37",    icon: "🙌" },
-  { label: "Zones Covered",     value: "12",    icon: "📍" },
-  { label: "Avg Flyers / Vol.", value: "123",   icon: "📊" },
+  { label: "Total Flyers", value: "4,554", icon: "FL" },
+  { label: "Active Volunteers", value: "37", icon: "AV" },
+  { label: "Zones Covered", value: "12", icon: "ZC" },
+  { label: "Avg Flyers / Vol.", value: "123", icon: "AVG" },
 ];
 
+const podiumSlots = [
+  { rank: 2, pos: -1.8, height: 1.4 },
+  { rank: 1, pos: 0, height: 1.9 },
+  { rank: 3, pos: 1.8, height: 1.1 },
+];
+
+function getInitials(name: string) {
+  return (
+    name
+      .trim()
+      .split(/\s+/)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase() ?? "")
+      .join("") || "?"
+  );
+}
+
+function hoursFromSeconds(totalSeconds: number) {
+  return totalSeconds / 3600;
+}
+
+function formatHours(totalSeconds: number) {
+  const hours = hoursFromSeconds(totalSeconds);
+  return hours >= 10 ? `${Math.round(hours)}h` : `${hours.toFixed(1)}h`;
+}
+
+function getStaticMetric(index: number) {
+  if (STATIC_FALLBACK[index]) {
+    return STATIC_FALLBACK[index];
+  }
+
+  const baseFlyers = Math.max(90, 200 - Math.max(0, index - 7) * 18);
+  const baseZones = Math.max(1, 4 - Math.max(0, index - 7));
+
+  return {
+    flyers: baseFlyers,
+    zones: baseZones,
+    badge: null,
+    color: "#6b7280",
+  };
+}
+
+function MedalSymbol({ color, label }: { color: string; label: string }) {
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        width: 18,
+        height: 18,
+        verticalAlign: "middle",
+      }}
+    >
+      <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+        <path d="M5 1.5h3l1 4H6z" fill="#7c3aed" />
+        <path d="M10 1.5h3l-1 4H9z" fill="#dc2626" />
+        <circle cx="9" cy="10.5" r="5" fill={color} stroke="rgba(26,22,0,0.18)" strokeWidth="0.8" />
+        <text
+          x="9"
+          y="12"
+          textAnchor="middle"
+          fontSize="6.5"
+          fontWeight="700"
+          fill="#1f1600"
+          fontFamily="Arial, sans-serif"
+        >
+          {label}
+        </text>
+      </svg>
+    </span>
+  );
+}
+
 export default function LeaderboardPage() {
+  const { user, logout } = useAuth();
+  const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
+  const [podiumEntries, setPodiumEntries] = useState<LeaderboardEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function load() {
+      try {
+        setLoading(true);
+        setError(null);
+        const response = await getLeaderboard();
+        if (!cancelled) {
+          setEntries(response.data);
+          setPodiumEntries(response.podium ?? []);
+        }
+      } catch (loadError) {
+        if (!cancelled) {
+          setError(loadError instanceof Error ? loadError.message : "Could not load leaderboard.");
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void load();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const displayRows = useMemo<DisplayRow[]>(() => {
+    if (!entries.length) {
+      return [];
+    }
+
+    const maxHours = Math.max(...entries.map((entry) => entry.hours ?? 0), 0.01);
+
+    return entries.map((entry) => {
+      const hours = entry.hours ?? entry.total_duration_seconds / 3600;
+      return {
+        ...entry,
+        flyers: entry.flyers ?? 0,
+        zones: 0,
+        badge: entry.rank <= 3 ? String(entry.rank) : null,
+        color: rankColors[entry.rank] ?? "#6b7280",
+        avatar: getInitials(entry.username),
+        isYou: entry.id === user?.id,
+        hoursLabel: formatHours(entry.total_duration_seconds),
+        progressPercent: Math.max(6, Math.round((hours / maxHours) * 100)),
+      };
+    });
+  }, [entries, user?.id]);
+
+  const podiumRows = useMemo(() => {
+    return podiumSlots
+      .map((slot) => {
+        const p = podiumEntries[slot.rank - 1];
+        if (!p) return null;
+        return {
+          name: p.username,
+          avatar: getInitials(p.username),
+          flyers: p.flyers ?? 0,
+          color: rankColors[slot.rank] ?? "#f5c842",
+          height: slot.height,
+          rank: slot.rank,
+          pos: slot.pos,
+          profilePhotoUrl: p.profile_photo_url,
+        };
+      })
+      .filter((entry): entry is PodiumRow => entry !== null);
+  }, [podiumEntries]);
+
+  const yourStanding = useMemo(
+    () => displayRows.find((entry) => entry.isYou) ?? null,
+    [displayRows]
+  );
+
+  const yourIndex = useMemo(
+    () => displayRows.findIndex((entry) => entry.isYou),
+    [displayRows]
+  );
+
+  const personAhead = yourIndex > 0 ? displayRows[yourIndex - 1] : null;
+  const yourHours = yourStanding ? hoursFromSeconds(yourStanding.total_duration_seconds) : 0;
+  const aheadHours = personAhead ? hoursFromSeconds(personAhead.total_duration_seconds) : yourHours;
+  const progressToNext =
+    personAhead && aheadHours > 0 ? Math.min(100, (yourHours / aheadHours) * 100) : 100;
+
+  if (user?.isGuest) {
+    return (
+      <GuestGate
+        message="Login or sign up to access the leaderboard and see how you rank."
+        onGoToLogin={logout}
+      />
+    );
+  }
+
   return (
     <PageContainer>
-
-        {/* ── Row 1: 3D Podium + Sidebar ───────────────────────────── */}
-        <div
-          className="anim-fade-up d1"
-          style={{ display: "grid", gridTemplateColumns: "1fr 296px", gap: 20, marginBottom: 20 }}
+      <div
+        className="anim-fade-up d1"
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+          gap: 20,
+          marginBottom: 20,
+        }}
+      >
+        <SectionCard
+          dark
+          noPadding
+          style={{ position: "relative", minHeight: 360, overflow: "hidden" }}
         >
-          {/* 3D Podium — dark SectionCard with noPadding so canvas bleeds to edges */}
-          <SectionCard
-            dark
-            noPadding
-            style={{ position: "relative", minHeight: 360, overflow: "hidden" }}
-          >
-            {/* Gradient header overlay */}
-            <div style={{
-              position: "absolute", top: 0, left: 0, right: 0, zIndex: 10,
+          <div
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              zIndex: 10,
               padding: "20px 24px",
               background: "linear-gradient(to bottom, rgba(26,18,0,0.92) 0%, transparent 100%)",
-            }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <div>
-                  <h3 style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 20, fontWeight: 700, color: "#f5c842", letterSpacing: "-0.4px" }}>
-                    🏆 Champions Podium
-                  </h3>
-                  <p style={{ fontSize: 12, color: "rgba(245,200,66,0.45)", marginTop: 2 }}>March 2025 · Live 3D</p>
-                </div>
-                <div style={{ display: "flex", gap: 6 }}>
-                  {["🥇 PK", "🥈 MW", "🥉 SR"].map((t) => (
-                    <span key={t} style={{ fontSize: 11, fontWeight: 600, padding: "4px 10px", borderRadius: 20, background: "rgba(245,200,66,0.12)", color: "rgba(245,200,66,0.8)", border: "1px solid rgba(245,200,66,0.2)" }}>
-                      {t}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* Three.js canvas */}
-            <PodiumCanvas />
-
-            {/* Bottom legend overlay */}
-            <div style={{
-              position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 10,
-              padding: "16px 24px",
-              background: "linear-gradient(to top, rgba(26,18,0,0.95) 0%, transparent 100%)",
-              display: "flex", justifyContent: "center", gap: 28,
-            }}>
-              {[
-                { name: "Priya K.",  flyers: 820, color: "#f5c842", rank: "1st" },
-                { name: "Marcus W.", flyers: 710, color: "#c0c0c0", rank: "2nd" },
-                { name: "Sofia R.",  flyers: 640, color: "#cd7f32", rank: "3rd" },
-              ].map((p) => (
-                <div key={p.name} style={{ textAlign: "center" }}>
-                  <p style={{ fontSize: 11, fontWeight: 700, color: p.color, marginBottom: 1 }}>{p.rank} · {p.name}</p>
-                  <p style={{ fontSize: 10.5, color: "rgba(245,200,66,0.4)" }}>{p.flyers} flyers</p>
-                </div>
-              ))}
-            </div>
-          </SectionCard>
-
-          {/* Right sidebar */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-
-            {/* Your Standing */}
-            <SectionCard dark title="Your Standing" subtitle="March 2025">
-              <div style={{ textAlign: "center", padding: "8px 0 12px" }}>
-                <div style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 56, fontWeight: 700, color: "#f5c842", lineHeight: 1, letterSpacing: "-2px" }}>
-                  #4
-                </div>
-                <p style={{ fontSize: 12, color: "rgba(245,200,66,0.45)", marginTop: 4 }}>out of 37 volunteers</p>
-              </div>
-              {/* Progress bar toward #3 */}
-              <div style={{ marginTop: 4 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                  <span style={{ fontSize: 11, color: "rgba(245,200,66,0.5)" }}>You · 340</span>
-                  <span style={{ fontSize: 11, color: "rgba(245,200,66,0.5)" }}>Sofia #3 · 640</span>
-                </div>
-                <div style={{ height: 6, borderRadius: 99, background: "rgba(255,255,255,0.08)", overflow: "hidden" }}>
-                  <div style={{ height: "100%", width: `${(340 / 640) * 100}%`, borderRadius: 99, background: "linear-gradient(90deg, #f5c842, #fbbf24)", boxShadow: "0 0 8px rgba(245,200,66,0.6)" }} />
-                </div>
-                <p style={{ fontSize: 11.5, color: "rgba(245,200,66,0.65)", marginTop: 10, textAlign: "center" }}>
-                  🔥 <strong style={{ color: "#f5c842" }}>300 more flyers</strong> to reach #3!
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 12,
+                flexWrap: "wrap",
+              }}
+            >
+              <div>
+                <h3
+                  style={{
+                    fontFamily: "'Fraunces', Georgia, serif",
+                    fontSize: 20,
+                    fontWeight: 700,
+                    color: "#f5c842",
+                    letterSpacing: "-0.4px",
+                  }}
+                >
+                  Champions Podium
+                </h3>
+                <p style={{ fontSize: 12, color: "rgba(245,200,66,0.45)", marginTop: 2 }}>
+                  Ranked by volunteered hours
                 </p>
               </div>
-            </SectionCard>
-
-            {/* Monthly Stats */}
-            <SectionCard title="Monthly Stats" style={{ flex: 1 }}>
-              {monthlyStats.map((s, i) => (
-                <div
-                  key={s.label}
-                  style={{
-                    display: "flex", alignItems: "center", justifyContent: "space-between",
-                    padding: "9px 0",
-                    borderBottom: i < monthlyStats.length - 1 ? "1px solid rgba(190,155,70,0.12)" : "none",
-                  }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <span style={{ fontSize: 14 }}>{s.icon}</span>
-                    <span style={{ fontSize: 12.5, color: "#7a6a40" }}>{s.label}</span>
-                  </div>
-                  <span style={{ fontSize: 14, fontWeight: 700, color: "#1a1600", fontFamily: "'Fraunces', Georgia, serif" }}>
-                    {s.value}
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                {podiumRows.map((row) => (
+                  <span
+                    key={row.rank}
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 600,
+                      padding: "4px 10px",
+                      borderRadius: 20,
+                      background: "rgba(245,200,66,0.12)",
+                      color: "rgba(245,200,66,0.8)",
+                      border: "1px solid rgba(245,200,66,0.2)",
+                      boxShadow: `0 0 18px ${rankColors[row.rank] ?? "#f5c842"}33`,
+                    }}
+                  >
+                    #{row.rank} {row.avatar}
                   </span>
-                </div>
-              ))}
-            </SectionCard>
-
-          </div>
-        </div>
-
-        {/* ── Row 2: Full Rankings ──────────────────────────────────── */}
-        <SectionCard
-          title="Full Rankings"
-          subtitle="All 37 volunteers · Updated live"
-          action={
-            <div style={{ display: "flex", gap: 6 }}>
-              {["All Time", "This Month", "This Week"].map((t, i) => (
-                <button
-                  key={t}
-                  style={{
-                    fontSize: 11.5, padding: "5px 12px", borderRadius: 20, cursor: "pointer",
-                    border: `1px solid ${i === 1 ? "#f5c842" : "rgba(190,155,70,0.2)"}`,
-                    background: i === 1 ? "#fef9c3" : "transparent",
-                    color: i === 1 ? "#92400e" : "#9a8a60",
-                    fontWeight: i === 1 ? 600 : 400,
-                  }}
-                >
-                  {t}
-                </button>
-              ))}
+                ))}
+              </div>
             </div>
-          }
-        >
-          {/* Column headers */}
-          <div style={{
-            display: "grid",
-            gridTemplateColumns: "44px 1fr 200px 90px 70px 70px",
-            gap: 12, padding: "0 10px 10px",
-            borderBottom: "1px solid rgba(190,155,70,0.15)",
-          }}>
-            {["#", "Volunteer", "Progress", "Flyers", "Zones", "Hours"].map((h) => (
-              <span key={h} style={{ fontSize: 10.5, fontWeight: 600, color: "#9a8a60", letterSpacing: "0.06em", textTransform: "uppercase" }}>
-                {h}
-              </span>
-            ))}
           </div>
 
-          <div style={{ marginTop: 6 }}>
-            {TOP.map((v, i) => {
-              const pct = Math.round((v.flyers / MAX_FLYERS) * 100);
-              return (
-                <div
-                  key={v.rank}
-                  className="anim-fade-up"
+          <PodiumCanvas
+            podiumData={
+              podiumRows.length
+                ? podiumRows
+                : [
+                    {
+                      name: "Volunteer One",
+                      avatar: "VO",
+                      flyers: 820,
+                      color: "#f5c842",
+                      height: 1.9,
+                      rank: 1,
+                      pos: 0,
+                    },
+                    {
+                      name: "Volunteer Two",
+                      avatar: "VT",
+                      flyers: 710,
+                      color: "#c0c0c0",
+                      height: 1.4,
+                      rank: 2,
+                      pos: -1.8,
+                    },
+                    {
+                      name: "Volunteer Three",
+                      avatar: "VT",
+                      flyers: 640,
+                      color: "#cd7f32",
+                      height: 1.1,
+                      rank: 3,
+                      pos: 1.8,
+                    },
+                  ]
+            }
+          />
+
+          <div
+            style={{
+              position: "absolute",
+              bottom: 0,
+              left: 0,
+              right: 0,
+              zIndex: 10,
+              padding: "16px 24px",
+              background: "linear-gradient(to top, rgba(26,18,0,0.95) 0%, transparent 100%)",
+              display: "flex",
+              justifyContent: "center",
+              gap: 20,
+              flexWrap: "wrap",
+            }}
+          >
+            {podiumRows.map((row) => (
+              <div key={row.rank} style={{ textAlign: "center" }}>
+                <p
                   style={{
-                    animationDelay: `${0.3 + i * 0.06}s`,
-                    display: "grid",
-                    gridTemplateColumns: "44px 1fr 200px 90px 70px 70px",
-                    gap: 12,
-                    alignItems: "center",
-                    padding: "10px 10px",
-                    borderRadius: 10,
-                    background: v.isYou ? "rgba(245,200,66,0.07)" : i % 2 === 0 ? "transparent" : "rgba(0,0,0,0.015)",
-                    border: v.isYou ? "1.5px solid rgba(245,200,66,0.30)" : "1.5px solid transparent",
-                    marginBottom: 3,
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: rankColors[row.rank] ?? "#f5c842",
+                    marginBottom: 1,
                   }}
                 >
-                  {/* Rank */}
-                  <div style={{ textAlign: "center" }}>
-                    {v.badge
-                      ? <span style={{ fontSize: 18 }}>{v.badge}</span>
-                      : <span style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 14, fontWeight: 700, color: rankColors[v.rank] ?? "#9a8a60" }}>{v.rank}</span>
-                    }
-                  </div>
-
-                  {/* Avatar + Name */}
-                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <div style={{
-                      width: 34, height: 34, borderRadius: 10, flexShrink: 0,
-                      background: v.isYou ? "#f5c842" : v.rank <= 3 ? (rankColors[v.rank] + "33") : "#f3f0e8",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: 11, fontWeight: 700,
-                      color: v.isYou ? "#1a1000" : v.rank <= 3 ? rankColors[v.rank] : "#5a4a20",
-                    }}>
-                      {v.avatar}
-                    </div>
-                    <div>
-                      <p style={{ fontSize: 13.5, fontWeight: 600, color: "#1a1600" }}>
-                        {v.name}
-                        {v.isYou && <span style={{ fontSize: 10.5, fontWeight: 400, color: "#9a8a60", marginLeft: 6 }}>(You)</span>}
-                      </p>
-                      <p style={{ fontSize: 11, color: "#9a8a60", marginTop: 1 }}>{v.zones} zones · {v.hours}h</p>
-                    </div>
-                  </div>
-
-                  {/* Progress bar */}
-                  <div>
-                    <div style={{ height: 5, borderRadius: 99, background: "rgba(0,0,0,0.07)", overflow: "hidden" }}>
-                      <div style={{
-                        height: "100%", width: `${pct}%`, borderRadius: 99,
-                        background: v.rank === 1 ? "linear-gradient(90deg,#f5c842,#fbbf24)"
-                          : v.rank === 2 ? "linear-gradient(90deg,#9ca3af,#d1d5db)"
-                          : v.rank === 3 ? "linear-gradient(90deg,#b45309,#d97706)"
-                          : v.isYou     ? "linear-gradient(90deg,#f5c842,#fde68a)"
-                          : "linear-gradient(90deg,#c4b89a,#d4c8aa)",
-                      }} />
-                    </div>
-                    <p style={{ fontSize: 10, color: "#b0a070", marginTop: 3 }}>{pct}% of top</p>
-                  </div>
-
-                  {/* Flyers */}
-                  <span style={{ fontSize: 14, fontWeight: 700, color: "#1a1600", fontFamily: "'Fraunces', Georgia, serif" }}>
-                    {v.flyers.toLocaleString()}
-                  </span>
-
-                  {/* Zones */}
-                  <span style={{ fontSize: 13, color: "#5a4a20" }}>{v.zones}</span>
-
-                  {/* Hours */}
-                  <span style={{ fontSize: 13, color: "#5a4a20" }}>{v.hours}h</span>
-                </div>
-              );
-            })}
+                  #{row.rank} | {row.name}
+                </p>
+                <p style={{ fontSize: 10.5, color: "rgba(245,200,66,0.4)" }}>
+                  {formatHours((podiumEntries[row.rank - 1]?.total_duration_seconds ?? 0))}
+                </p>
+              </div>
+            ))}
           </div>
         </SectionCard>
 
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <SectionCard dark title="Your Standing" subtitle="Live from saved route sessions">
+            {loading ? (
+              <p style={{ fontSize: 12.5, color: "rgba(245,200,66,0.56)" }}>
+                Loading your ranking...
+              </p>
+            ) : yourStanding ? (
+              <>
+                <div style={{ textAlign: "center", padding: "8px 0 12px" }}>
+                  <div
+                    style={{
+                      fontFamily: "'Fraunces', Georgia, serif",
+                      fontSize: 56,
+                      fontWeight: 700,
+                      color: "#f5c842",
+                      lineHeight: 1,
+                      letterSpacing: "-2px",
+                    }}
+                  >
+                    #{yourStanding.rank}
+                  </div>
+                  <p style={{ fontSize: 12, color: "rgba(245,200,66,0.45)", marginTop: 4 }}>
+                    out of {displayRows.length} volunteers
+                  </p>
+                </div>
+                <div style={{ marginTop: 4 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                    <span style={{ fontSize: 11, color: "rgba(245,200,66,0.5)" }}>
+                      You | {yourStanding.hoursLabel}
+                    </span>
+                    <span style={{ fontSize: 11, color: "rgba(245,200,66,0.5)" }}>
+                      {personAhead
+                        ? `${personAhead.username} | ${personAhead.hoursLabel}`
+                        : "Top position"}
+                    </span>
+                  </div>
+                  <div
+                    style={{
+                      height: 6,
+                      borderRadius: 99,
+                      background: "rgba(255,255,255,0.08)",
+                      overflow: "hidden",
+                    }}
+                  >
+                    <div
+                      style={{
+                        height: "100%",
+                        width: `${progressToNext}%`,
+                        borderRadius: 99,
+                        background: "linear-gradient(90deg, #f5c842, #fbbf24)",
+                        boxShadow: "0 0 8px rgba(245,200,66,0.6)",
+                      }}
+                    />
+                  </div>
+                  <p
+                    style={{
+                      fontSize: 11.5,
+                      color: "rgba(245,200,66,0.65)",
+                      marginTop: 10,
+                      textAlign: "center",
+                    }}
+                  >
+                    {personAhead
+                      ? `${Math.max(0, aheadHours - yourHours).toFixed(1)} more hours to move up`
+                      : "You are leading the board"}
+                  </p>
+                </div>
+              </>
+            ) : (
+              <p style={{ fontSize: 12.5, color: "rgba(245,200,66,0.56)" }}>
+                Save route sessions to appear in the live ranking.
+              </p>
+            )}
+          </SectionCard>
+
+          <SectionCard title="Monthly Stats" style={{ flex: 1 }}>
+            {monthlyStats.map((stat, index) => (
+              (() => {
+                const highlight =
+                  monthlyStatHighlights[index] ?? monthlyStatHighlights[monthlyStatHighlights.length - 1];
+
+                return (
+              <div
+                key={stat.label}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  padding: "12px 14px",
+                  borderRadius: 18,
+                  background: highlight.background,
+                  boxShadow: `${highlight.shadow}, inset 0 1px 0 rgba(255,255,255,0.6)`,
+                  marginBottom: index < monthlyStats.length - 1 ? 8 : 0,
+                  borderBottom:
+                    index < monthlyStats.length - 1 ? "1px solid rgba(190,155,70,0.06)" : "none",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span
+                    style={{
+                      minWidth: 34,
+                      padding: "5px 8px",
+                      borderRadius: 999,
+                      background: "rgba(255,255,255,0.78)",
+                      boxShadow: highlight.shadow,
+                      fontSize: 10,
+                      fontWeight: 700,
+                      color: highlight.pill,
+                      textAlign: "center",
+                    }}
+                  >
+                    {stat.icon}
+                  </span>
+                  <span style={{ fontSize: 12.5, color: "#7a6a40" }}>{stat.label}</span>
+                </div>
+                <span
+                  style={{
+                    fontSize: 14,
+                    fontWeight: 700,
+                    color: "#1a1600",
+                    fontFamily: "'Fraunces', Georgia, serif",
+                  }}
+                >
+                  {stat.value}
+                </span>
+              </div>
+                );
+              })()
+            ))}
+          </SectionCard>
+        </div>
+      </div>
+
+      <SectionCard
+        title="Full Rankings"
+        subtitle={`${displayRows.length || 0} volunteers | ranked by impact (hours + flyers)`}
+        action={
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            {["All Time", "This Month", "This Week"].map((tab, index) => (
+              <button
+                key={tab}
+                style={{
+                  fontSize: 11.5,
+                  padding: "5px 12px",
+                  borderRadius: 20,
+                  cursor: "pointer",
+                  border: `1px solid ${index === 0 ? "#f5c842" : "rgba(190,155,70,0.2)"}`,
+                  background: index === 0 ? "#fef9c3" : "transparent",
+                  color: index === 0 ? "#92400e" : "#9a8a60",
+                  fontWeight: index === 0 ? 600 : 400,
+                }}
+              >
+                {tab}
+              </button>
+            ))}
+          </div>
+        }
+      >
+        {error ? (
+          <p style={{ fontSize: 13, color: "#b91c1c" }}>{error}</p>
+        ) : loading ? (
+          <p style={{ fontSize: 13, color: "#8a7a50" }}>Loading leaderboard...</p>
+        ) : (
+          <div style={{ marginTop: 6, overflowX: "auto" }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "44px minmax(180px, 1fr) 200px 90px 70px",
+                gap: 12,
+                padding: "0 10px 10px",
+                borderBottom: "1px solid rgba(190,155,70,0.15)",
+                minWidth: 600,
+              }}
+            >
+              {["#", "Volunteer", "Progress", "Flyers", "Hours"].map((heading) => (
+                <span
+                  key={heading}
+                  style={{
+                    fontSize: 10.5,
+                    fontWeight: 600,
+                    color: "#9a8a60",
+                    letterSpacing: "0.06em",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  {heading}
+                </span>
+              ))}
+            </div>
+            {displayRows.map((volunteer, index) => (
+              (() => {
+                const topThreeBackground =
+                  volunteer.rank === 1
+                    ? "linear-gradient(90deg, rgba(245,200,66,0.18), rgba(255,248,220,0.55))"
+                    : volunteer.rank === 2
+                      ? "linear-gradient(90deg, rgba(156,163,175,0.16), rgba(248,250,252,0.65))"
+                      : volunteer.rank === 3
+                        ? "linear-gradient(90deg, rgba(180,83,9,0.16), rgba(255,247,237,0.62))"
+                        : null;
+
+                const rowBorder =
+                  volunteer.rank === 1
+                    ? "1.5px solid rgba(245,200,66,0.34)"
+                    : volunteer.rank === 2
+                      ? "1.5px solid rgba(156,163,175,0.28)"
+                      : volunteer.rank === 3
+                        ? "1.5px solid rgba(180,83,9,0.24)"
+                        : volunteer.isYou
+                          ? "1.5px solid rgba(245,200,66,0.30)"
+                          : "1.5px solid transparent";
+
+                return (
+              <div
+                key={volunteer.id}
+                className="anim-fade-up"
+                style={{
+                  animationDelay: `${0.3 + index * 0.06}s`,
+                  display: "grid",
+                  gridTemplateColumns: "44px minmax(180px, 1fr) 200px 90px 70px",
+                  gap: 12,
+                  alignItems: "center",
+                  padding: "10px 10px",
+                  borderRadius: 10,
+                  background:
+                    topThreeBackground ??
+                    (volunteer.isYou
+                      ? "rgba(245,200,66,0.07)"
+                      : index % 2 === 0
+                        ? "transparent"
+                        : "rgba(0,0,0,0.015)"),
+                  border: rowBorder,
+                  boxShadow: topThreeBackground ? `0 10px 24px ${rankColors[volunteer.rank]}18` : "none",
+                  marginBottom: 3,
+                  minWidth: 600,
+                }}
+              >
+                <div style={{ textAlign: "center" }}>
+                  {volunteer.rank <= 3 ? (
+                    <span
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        minWidth: 58,
+                        height: 28,
+                        padding: "0 10px",
+                        borderRadius: 999,
+                        background: `linear-gradient(135deg, ${rankColors[volunteer.rank] ?? "#9a8a60"}33, rgba(255,255,255,0.9))`,
+                        color: "#1f1600",
+                        fontSize: 10.5,
+                        fontWeight: 700,
+                        letterSpacing: "0.06em",
+                        boxShadow: `0 10px 20px ${rankColors[volunteer.rank] ?? "#9a8a60"}22`,
+                      }}
+                    >
+                      <MedalSymbol
+                        color={rankColors[volunteer.rank] ?? "#9a8a60"}
+                        label={String(volunteer.rank)}
+                      />
+                    </span>
+                  ) : (
+                    <span
+                      style={{
+                        fontFamily: "'Fraunces', Georgia, serif",
+                        fontSize: 14,
+                        fontWeight: 700,
+                        color: rankColors[volunteer.rank] ?? "#9a8a60",
+                      }}
+                    >
+                      {volunteer.rank}
+                    </span>
+                  )}
+                </div>
+
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div
+                    style={{
+                      width: 34,
+                      height: 34,
+                      borderRadius: 10,
+                      flexShrink: 0,
+                      background: volunteer.isYou
+                        ? "#f5c842"
+                        : volunteer.rank <= 3
+                          ? `${rankColors[volunteer.rank]}33`
+                          : "#f3f0e8",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: 11,
+                      fontWeight: 700,
+                      color: volunteer.isYou
+                        ? "#1a1000"
+                        : volunteer.rank <= 3
+                          ? rankColors[volunteer.rank]
+                          : "#5a4a20",
+                      overflow: "hidden",
+                    }}
+                  >
+                    {volunteer.profile_photo_url ? (
+                      <Image
+                        src={volunteer.profile_photo_url}
+                        alt={volunteer.username}
+                        width={34}
+                        height={34}
+                        unoptimized
+                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                      />
+                    ) : (
+                      volunteer.avatar
+                    )}
+                  </div>
+                  <div>
+                    <p style={{ fontSize: 13.5, fontWeight: 600, color: "#1a1600" }}>
+                      {volunteer.username}
+                      {volunteer.isYou ? (
+                        <span
+                          style={{
+                            fontSize: 10.5,
+                            fontWeight: 400,
+                            color: "#9a8a60",
+                            marginLeft: 6,
+                          }}
+                        >
+                          (You)
+                        </span>
+                      ) : null}
+                    </p>
+                    <p style={{ fontSize: 11, color: "#9a8a60", marginTop: 1 }}>
+                      {volunteer.flyers.toLocaleString()} flyers | {volunteer.hoursLabel}
+                    </p>
+                  </div>
+                </div>
+
+                <div>
+                  <div
+                    style={{
+                      height: 5,
+                      borderRadius: 99,
+                      background: "rgba(0,0,0,0.07)",
+                      overflow: "hidden",
+                    }}
+                  >
+                    <div
+                      style={{
+                        height: "100%",
+                        width: `${volunteer.progressPercent}%`,
+                        borderRadius: 99,
+                        background:
+                          volunteer.rank === 1
+                            ? "linear-gradient(90deg,#f5c842,#fbbf24)"
+                            : volunteer.rank === 2
+                              ? "linear-gradient(90deg,#9ca3af,#d1d5db)"
+                              : volunteer.rank === 3
+                                ? "linear-gradient(90deg,#b45309,#d97706)"
+                                : volunteer.isYou
+                                  ? "linear-gradient(90deg,#f5c842,#fde68a)"
+                                  : "linear-gradient(90deg,#c4b89a,#d4c8aa)",
+                      }}
+                    />
+                  </div>
+                  <p style={{ fontSize: 10, color: "#b0a070", marginTop: 3 }}>
+                    {volunteer.hoursLabel}
+                  </p>
+                </div>
+
+                <span
+                  style={{
+                    fontSize: 14,
+                    fontWeight: 700,
+                    color: "#1a1600",
+                    fontFamily: "'Fraunces', Georgia, serif",
+                  }}
+                >
+                  {volunteer.flyers.toLocaleString()}
+                </span>
+
+                <span style={{ fontSize: 13, color: "#5a4a20" }}>{volunteer.hoursLabel}</span>
+              </div>
+                );
+              })()
+            ))}
+          </div>
+        )}
+      </SectionCard>
     </PageContainer>
   );
 }

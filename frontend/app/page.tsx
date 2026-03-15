@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { HoverLink } from "@/components/common/HoverLink";
+import RecentActivity from "@/components/home/RecentActivity";
 
 /* ─── Data ───────────────────────────────── */
 const STATS = [
@@ -13,14 +14,7 @@ const QUICK = [
   { href: "/map",         emoji: "🗺️", label: "Flyering Zones", desc: "Find where to distribute flyers today", bg: "#fef9c3", border: "#fde68a" },
   { href: "/printers",    emoji: "🖨️", label: "Find a Printer",  desc: "Locate nearby print shops",            bg: "#ede9fe", border: "#ddd6fe" },
   { href: "/leaderboard", emoji: "🏆", label: "Leaderboard",     desc: "See this month's top volunteers",      bg: "#dcfce7", border: "#bbf7d0" },
-  { href: "/onboarding",  emoji: "🚀", label: "New Volunteer?",  desc: "Get started in 4 easy steps",          bg: "#fce7f3", border: "#fbcfe8" },
-];
-
-const ACTIVITY = [
-  { name: "Maria G.",  avatar: "MG", action: "Distributed 40 flyers",     zone: "South Bronx",     time: "2h ago",    color: "#f5c842" },
-  { name: "James T.",  avatar: "JT", action: "Completed onboarding",       zone: "",                time: "3h ago",    color: "#22c55e" },
-  { name: "Priya K.",  avatar: "PK", action: "Added 2 resource locations", zone: "East Harlem",     time: "5h ago",    color: "#8b5cf6" },
-  { name: "Carlos M.", avatar: "CM", action: "Printed 100 flyers",         zone: "Staples Midtown", time: "Yesterday", color: "#f97316" },
+  { href: "/getstarted",  emoji: "🚀", label: "New Volunteer?",  desc: "Get started in 4 easy steps",          bg: "#fce7f3", border: "#fbcfe8" },
 ];
 
 const card: React.CSSProperties = {
@@ -77,7 +71,7 @@ export default function HomePage() {
           </p>
           {/* Static link — no hover handlers needed on hero CTA */}
           <Link
-            href="/onboarding"
+            href="/getstarted"
             style={{
               display: "inline-flex", alignItems: "center", gap: 8,
               padding: "10px 22px", borderRadius: 11,
@@ -167,29 +161,7 @@ export default function HomePage() {
             </div>
             <span style={{ fontSize: 12, color: "#9a8a60", cursor: "pointer" }}>View all →</span>
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            {ACTIVITY.map((a, i) => (
-              <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
-                <div style={{
-                  width: 34, height: 34, borderRadius: 10,
-                  background: a.color + "28",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: 11, fontWeight: 700, color: a.color,
-                  flexShrink: 0, letterSpacing: "-0.3px",
-                }}>
-                  {a.avatar}
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ fontSize: 12.5, fontWeight: 600, color: "#1a1600", lineHeight: 1.1 }}>{a.name}</p>
-                  <p style={{ fontSize: 12, color: "#5a4a20", marginTop: 2, lineHeight: 1.35 }}>
-                    {a.action}
-                    {a.zone && <span style={{ color: "#9a8a60" }}> · {a.zone}</span>}
-                  </p>
-                  <p style={{ fontSize: 11, color: "#b0a070", marginTop: 2 }}>{a.time}</p>
-                </div>
-              </div>
-            ))}
-          </div>
+          <RecentActivity />
         </div>
       </div>
 

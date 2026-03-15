@@ -1,154 +1,810 @@
+"use client";
+
+import { useEffect, useMemo, useRef, useState } from "react";
+import Image from "next/image";
 import PageContainer from "@/components/layout/PageContainer";
 import SectionCard from "@/components/common/SectionCard";
 import StatCard from "@/components/common/StatCard";
+import { useAuth } from "@/context/AuthContext";
+import GuestGate from "@/components/auth/GuestGate";
+import { formatDistance } from "@/lib/distance";
+import { formatDuration } from "@/lib/session";
+import { uploadProfilePhoto } from "@/lib/auth-api";
+import { getSessions } from "@/lib/session-api";
+import { getBadges, type BadgesData } from "@/lib/badges-api";
+import { getLeaderboard, type LeaderboardEntry } from "@/lib/leaderboard-api";
+import {
+  generateCertificatePdf,
+  generateCertificatePng,
+  downloadBlob,
+} from "@/lib/certificate";
+import type { VolunteerSession } from "@/types/tracker";
 
-const stats = [
-  { label: "Flyers Handed Out",  value: "340", icon: "📄", iconBg: "#fef3c7" },
-  { label: "Zones Visited",      value: "8",   icon: "📍", iconBg: "#ede9fe" },
-  { label: "Hours Volunteered",  value: "24",  icon: "⏱️", iconBg: "#dcfce7" },
-  { label: "Current Rank",       value: "#4",  icon: "🏆", iconBg: "#fee2e2" },
-];
+const BADGE_CONFIG = [
+  { key: "first_flyer" as const, label: "First Flyer", tone: "#f6e58d", emoji: "📄" },
+  { key: "hundred_flyers" as const, label: "100 Flyers", tone: "#fef3c7", emoji: "💯" },
+  { key: "on_a_streak" as const, label: "On a Streak", tone: "#d9f99d", emoji: "🔥" },
+  { key: "top_5" as const, label: "Top 5", tone: "#fde68a", emoji: "🏅" },
+  { key: "top_1" as const, label: "Top 1", tone: "#f5c842", emoji: "🏆" },
+] as const;
 
-const activity = [
-  { date: "Mar 10", zone: "South Bronx Zone A",    flyers: 60  },
-  { date: "Mar 7",  zone: "East Harlem Hub",        flyers: 45  },
-  { date: "Mar 3",  zone: "Bushwick Distribution",  flyers: 80  },
-  { date: "Feb 28", zone: "Crown Heights Center",   flyers: 55  },
-  { date: "Feb 21", zone: "Jackson Heights Point",  flyers: 100 },
-];
+function getInitials(name: string) {
+  const parts = name.trim().split(/\s+/).slice(0, 2);
+  return parts.map((part) => part[0]?.toUpperCase() ?? "").join("") || "?";
+}
 
-const badges = [
-  { emoji: "🌱", label: "First Flyer",    earned: true  },
-  { emoji: "🔥", label: "On a Streak",   earned: true  },
-  { emoji: "🗺️", label: "Zone Explorer", earned: true  },
-  { emoji: "💯", label: "100 Flyers",    earned: true  },
-  { emoji: "🏆", label: "Top 5",         earned: false },
-  { emoji: "🌟", label: "Community Star",earned: false },
-];
+function formatJoinedDate(value: string) {
+  if (!value) return "Joined recently";
+  return `Joined ${new Date(value).toLocaleString(undefined, { month: "long", year: "numeric" })}`;
+}
 
-const profileMeta = [
-  { icon: "📍", label: "Brooklyn, NY" },
-  { icon: "📅", label: "Joined January 2025" },
-  { icon: "🌐", label: "English, Spanish" },
-];
+function formatCompactHours(totalSeconds: number) {
+  const hours = totalSeconds / 3600;
+  return hours >= 10 ? `${Math.round(hours)}h` : `${hours.toFixed(1)}h`;
+}
+
+function buildActivityTitle(session: VolunteerSession) {
+  const labeledStop = session.stops.find((stop) => stop.label?.trim());
+  if (labeledStop?.label) {
+    return labeledStop.label;
+  }
+
+  if (session.stops.length > 0) {
+    return `${session.stops.length} outreach stop${session.stops.length === 1 ? "" : "s"}`;
+  }
+
+  return `Route Session #${session.id}`;
+}
 
 export default function ProfilePage() {
+  const { user, token, loading, isGuest, setUser, logout } = useAuth();
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [sessions, setSessions] = useState<VolunteerSession[]>([]);
+  const [sessionsLoading, setSessionsLoading] = useState(true);
+  const [sessionsError, setSessionsError] = useState<string | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
+  const [selectedRoute, setSelectedRoute] = useState<{ title: string; imageUrl: string } | null>(null);
+  const [routeZoom, setRouteZoom] = useState(1);
+  const [photoState, setPhotoState] = useState<"idle" | "uploading" | "error">("idle");
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const [badgesData, setBadgesData] = useState<BadgesData | null>(null);
+  const [badgesLoading, setBadgesLoading] = useState(true);
+  const [leaderboardEntries, setLeaderboardEntries] = useState<LeaderboardEntry[]>([]);
+  const [leaderboardLoading, setLeaderboardLoading] = useState(true);
+  const [certificateLoading, setCertificateLoading] = useState<"idle" | "pdf" | "png">("idle");
+  const [certificateError, setCertificateError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const mediaQuery = window.matchMedia("(max-width: 900px)");
+    const updateViewport = () => setIsMobile(mediaQuery.matches);
+    updateViewport();
+    mediaQuery.addEventListener("change", updateViewport);
+
+    return () => mediaQuery.removeEventListener("change", updateViewport);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadSessions() {
+      if (!token || isGuest) {
+        if (!cancelled) {
+          setSessions([]);
+          setSessionsLoading(false);
+          setSessionsError(null);
+        }
+        return;
+      }
+
+      try {
+        setSessionsLoading(true);
+        setSessionsError(null);
+        const response = await getSessions(token);
+        if (!cancelled) {
+          setSessions(response.data);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setSessionsError(error instanceof Error ? error.message : "Could not load activity.");
+        }
+      } finally {
+        if (!cancelled) {
+          setSessionsLoading(false);
+        }
+      }
+    }
+
+    loadSessions();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isGuest, token]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!token || isGuest) {
+      setBadgesData(null);
+      setBadgesLoading(false);
+      return;
+    }
+    setBadgesLoading(true);
+    getBadges(token)
+      .then((res) => {
+        if (!cancelled) setBadgesData(res.data);
+      })
+      .catch(() => {
+        if (!cancelled) setBadgesData(null);
+      })
+      .finally(() => {
+        if (!cancelled) setBadgesLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [token, isGuest]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (isGuest) {
+      setLeaderboardEntries([]);
+      setLeaderboardLoading(false);
+      return;
+    }
+    setLeaderboardLoading(true);
+    getLeaderboard()
+      .then((res) => {
+        if (!cancelled) setLeaderboardEntries(res.data ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) setLeaderboardEntries([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLeaderboardLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isGuest]);
+
+  const { myRankEntry, personAhead } = useMemo(() => {
+    if (!user?.id || !leaderboardEntries.length) {
+      return { myRankEntry: null, personAhead: null };
+    }
+    const my = leaderboardEntries.find((e) => e.id === user.id) ?? null;
+    const ahead = my ? leaderboardEntries.find((e) => e.rank === my.rank - 1) ?? null : null;
+    return { myRankEntry: my, personAhead: ahead };
+  }, [user?.id, leaderboardEntries]);
+
+  const stats = useMemo(() => {
+    const totalDistanceMeters = sessions.reduce((total, session) => total + session.totalDistanceMeters, 0);
+    const totalDurationSeconds = sessions.reduce((total, session) => total + session.durationSeconds, 0);
+    const totalStops = sessions.reduce((total, session) => total + session.stops.length, 0);
+
+    return [
+      { label: "Route Sessions", value: sessions.length.toString(), icon: "RS", iconBg: "#fef3c7" },
+      { label: "Stops Logged", value: totalStops.toString(), icon: "ST", iconBg: "#ecfccb" },
+      { label: "Hours Volunteered", value: formatCompactHours(totalDurationSeconds), icon: "HR", iconBg: "#dcfce7" },
+      { label: "Distance Walked", value: formatDistance(totalDistanceMeters), icon: "KM", iconBg: "#d9f99d" },
+    ];
+  }, [sessions]);
+
+  const recentSessions = sessions.slice(0, 5);
+  const displayName = user?.full_name?.trim() || user?.username || "Volunteer";
+  const emailLabel = user?.email || "Email unavailable";
+  const joinedLabel = user?.created_at ? formatJoinedDate(user.created_at) : "Joined recently";
+
+  async function handlePhotoSelection(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file || !token) {
+      return;
+    }
+
+    if (!file.type.startsWith("image/")) {
+      setPhotoState("error");
+      setPhotoError("Please choose an image file.");
+      return;
+    }
+
+    const imageUrl = await readFileAsDataUrl(file);
+
+    try {
+      setPhotoState("uploading");
+      setPhotoError(null);
+      const response = await uploadProfilePhoto(token, imageUrl);
+      setUser(response.user);
+      setPhotoState("idle");
+    } catch (error) {
+      setPhotoState("error");
+      setPhotoError(error instanceof Error ? error.message : "Could not upload photo.");
+    } finally {
+      event.target.value = "";
+    }
+  }
+
+  if (isGuest) {
+    return (
+      <GuestGate
+        message="Login or sign up to view your profile and track your impact."
+        onGoToLogin={logout}
+      />
+    );
+  }
+
   return (
-    <PageContainer>
-      <div style={{ display: "grid", gridTemplateColumns: "260px 1fr", gap: 20 }}>
-
-        {/* ── Left column ──────────────────────────────────────── */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-
-          {/* Profile card */}
+    <PageContainer style={{ padding: isMobile ? "16px 14px 28px" : "28px 32px 40px" }}>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: isMobile ? "1fr" : "minmax(260px, 300px) minmax(0, 1fr)",
+          gap: 18,
+          alignItems: "start",
+        }}
+      >
+        <div style={{ display: "grid", gap: 16 }}>
           <SectionCard>
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", paddingTop: 8, paddingBottom: 8 }}>
-              {/* Avatar */}
-              <div style={{
-                width: 76, height: 76, borderRadius: 20, marginBottom: 14,
-                background: "linear-gradient(135deg, #f5c842, #e8a200)",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: 24, fontWeight: 700, color: "#1a1000",
-                boxShadow: "0 4px 16px rgba(245,200,66,0.35)",
-              }}>
-                SG
+              <div
+                style={{
+                  width: 82,
+                  height: 82,
+                  borderRadius: 24,
+                  marginBottom: 14,
+                  background: "linear-gradient(145deg, #f4d84d 0%, #b9cf51 100%)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 24,
+                  fontWeight: 800,
+                  color: "#31401f",
+                  boxShadow: "0 10px 24px rgba(185,207,81,0.3)",
+                  overflow: "hidden",
+                }}
+              >
+                {user?.profile_photo_url ? (
+                  <Image
+                    src={user.profile_photo_url}
+                    alt={displayName}
+                    width={82}
+                    height={82}
+                    unoptimized
+                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                  />
+                ) : (
+                  getInitials(displayName)
+                )}
               </div>
-              <h2 style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 20, fontWeight: 700, color: "#1a1600", letterSpacing: "-0.4px" }}>
-                Sharvin Gavad
+              <h2 style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 22, fontWeight: 700, color: "#1f2b12", letterSpacing: "-0.4px" }}>
+                {displayName}
               </h2>
-              <p style={{ fontSize: 13, color: "#9a8a60", marginTop: 3 }}>Community Volunteer</p>
-              <div style={{ marginTop: 10, padding: "4px 12px", borderRadius: 99, background: "#dcfce7", fontSize: 11.5, fontWeight: 600, color: "#15803d" }}>
-                ✅ Verified Volunteer
+              <p style={{ fontSize: 13, color: "#78814f", marginTop: 3 }}>{emailLabel}</p>
+              {!isGuest ? (
+                <>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handlePhotoSelection}
+                    style={{ display: "none" }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={!token || photoState === "uploading"}
+                    style={{
+                      marginTop: 12,
+                      padding: "8px 12px",
+                      borderRadius: 999,
+                      border: "1px solid rgba(185,207,81,0.34)",
+                      background: "rgba(244,216,77,0.14)",
+                      color: "#4d5c1e",
+                      fontSize: 11.5,
+                      fontWeight: 700,
+                    }}
+                  >
+                    {photoState === "uploading" ? "Uploading..." : "Upload Photo"}
+                  </button>
+                  {photoError ? (
+                    <p style={{ marginTop: 8, fontSize: 12, color: "#b91c1c" }}>{photoError}</p>
+                  ) : null}
+                </>
+              ) : null}
+              <div
+                style={{
+                  marginTop: 10,
+                  padding: "6px 12px",
+                  borderRadius: 999,
+                  background: user?.agreed_to_terms ? "#e7f7d6" : "#fff4d4",
+                  fontSize: 11.5,
+                  fontWeight: 700,
+                  color: user?.agreed_to_terms ? "#4d7c0f" : "#9a6700",
+                }}
+              >
+                {user?.agreed_to_terms ? "Verified Volunteer" : "Terms Pending"}
               </div>
 
-              {/* Meta info */}
               <div style={{ width: "100%", marginTop: 18, paddingTop: 16, borderTop: "1px solid rgba(190,155,70,0.18)", textAlign: "left" }}>
-                {profileMeta.map((m) => (
-                  <div key={m.label} style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 0" }}>
-                    <span style={{ fontSize: 14 }}>{m.icon}</span>
-                    <span style={{ fontSize: 13, color: "#5a4a20" }}>{m.label}</span>
+                {[
+                  { key: "joined", accent: "#d9f99d", label: joinedLabel },
+                  { key: "community", accent: "#fef3c7", label: "Community Volunteer" },
+                  { key: "language", accent: "#ecfccb", label: "English, Spanish" },
+                ].map((item) => (
+                  <div key={item.key} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0" }}>
+                    <span style={{ width: 10, height: 10, borderRadius: 999, background: item.accent, boxShadow: "inset 0 0 0 1px rgba(49,64,31,0.08)" }} />
+                    <span style={{ fontSize: 13, color: "#5a5f2f" }}>{item.label}</span>
                   </div>
                 ))}
               </div>
+
+              {!isGuest ? (
+                <button
+                  type="button"
+                  onClick={() => logout()}
+                  style={{
+                    width: "100%",
+                    marginTop: 18,
+                    padding: "10px 14px",
+                    borderRadius: 12,
+                    border: "1px solid rgba(190,155,70,0.28)",
+                    background: "rgba(239,68,68,0.08)",
+                    color: "#b91c1c",
+                    fontSize: 13,
+                    fontWeight: 700,
+                    cursor: "pointer",
+                  }}
+                >
+                  Log out
+                </button>
+              ) : null}
             </div>
           </SectionCard>
 
-          {/* Badges */}
-          <SectionCard title="Badges">
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
-              {badges.map((b) => (
-                <div
-                  key={b.label}
-                  style={{
-                    display: "flex", flexDirection: "column", alignItems: "center", gap: 5,
-                    padding: "10px 6px", borderRadius: 12, textAlign: "center",
-                    background: b.earned ? "rgba(245,200,66,0.12)" : "#f5f3ee",
-                    border: `1px solid ${b.earned ? "rgba(245,200,66,0.3)" : "rgba(0,0,0,0.05)"}`,
-                    opacity: b.earned ? 1 : 0.55,
-                  }}
-                >
-                  <span style={{ fontSize: 20 }}>{b.emoji}</span>
-                  <span style={{ fontSize: 10.5, fontWeight: 600, color: "#1a1600", lineHeight: 1.2 }}>{b.label}</span>
-                </div>
-              ))}
-            </div>
+          <SectionCard title="Badges" subtitle="Earned from your volunteer activity and leaderboard standing.">
+            {badgesLoading ? (
+              <p style={{ fontSize: 13, color: "#8a7a50" }}>Loading badges...</p>
+            ) : (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 10 }}>
+                {BADGE_CONFIG.map((badge) => {
+                  const earned = badgesData ? Boolean(badgesData[badge.key]) : false;
+                  return (
+                    <div
+                      key={badge.label}
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        gap: 6,
+                        padding: "12px 8px",
+                        borderRadius: 14,
+                        textAlign: "center",
+                        background: earned ? badge.tone : "#f8f7f0",
+                        border: `1px solid ${earned ? "rgba(185,207,81,0.35)" : "rgba(0,0,0,0.05)"}`,
+                        opacity: earned ? 1 : 0.58,
+                      }}
+                    >
+                      <span style={{ fontSize: 28, lineHeight: 1 }}>{badge.emoji}</span>
+                      <span style={{ fontSize: 10.5, fontWeight: 700, color: "#243112", lineHeight: 1.25 }}>{badge.label}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </SectionCard>
         </div>
 
-        {/* ── Right column ─────────────────────────────────────── */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-
-          {/* Stats row */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14 }}>
-            {stats.map((s) => (
-              <StatCard key={s.label} label={s.label} value={s.value} icon={s.icon} iconBg={s.iconBg} />
+        <div style={{ display: "grid", gap: 16 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 14 }}>
+            {stats.map((stat) => (
+              <StatCard key={stat.label} label={stat.label} value={stat.value} icon={stat.icon} iconBg={stat.iconBg} />
             ))}
           </div>
 
-          {/* Activity */}
-          <SectionCard title="Recent Activity" subtitle="Your last 5 volunteering sessions">
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {activity.map((a, i) => (
-                <div
-                  key={i}
-                  style={{
-                    display: "flex", alignItems: "center", gap: 14,
-                    padding: "12px 14px", borderRadius: 12,
-                    background: "#fdf8ec",
-                    border: "1px solid rgba(190,155,70,0.18)",
-                  }}
-                >
-                  <div style={{ width: 38, height: 38, borderRadius: 11, background: "rgba(245,200,66,0.15)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17, flexShrink: 0 }}>
-                    📄
+          <SectionCard title="Recent Activity" subtitle="Your last 5 saved route sessions">
+            {loading || sessionsLoading ? (
+              <p style={{ fontSize: 13, color: "#8a7a50" }}>Loading your profile activity...</p>
+            ) : sessionsError ? (
+              <p style={{ fontSize: 13, color: "#b91c1c" }}>{sessionsError}</p>
+            ) : recentSessions.length === 0 ? (
+              <p style={{ fontSize: 13, color: "#8a7a50" }}>No saved route sessions yet. Start a tracker session to build your activity history.</p>
+            ) : (
+              <div style={{ display: "grid", gap: 10 }}>
+                {recentSessions.map((session) => (
+                  <div
+                    key={session.id}
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: session.routeImageUrl ? "84px minmax(0, 1fr) auto" : "minmax(0, 1fr) auto",
+                      gap: 14,
+                      alignItems: "center",
+                      padding: "12px 14px",
+                      borderRadius: 16,
+                      background: "#fdf8ec",
+                      border: "1px solid rgba(190,155,70,0.18)",
+                    }}
+                  >
+                    {session.routeImageUrl ? (
+                      <Image
+                        src={session.routeImageUrl}
+                        alt="Route snapshot"
+                        width={84}
+                        height={84}
+                        unoptimized
+                        style={{
+                          width: 84,
+                          height: 84,
+                          objectFit: "cover",
+                          borderRadius: 12,
+                          border: "1px solid rgba(185,207,81,0.22)",
+                        }}
+                      />
+                    ) : null}
+                    <div style={{ minWidth: 0 }}>
+                      <p style={{ fontSize: 13.5, fontWeight: 700, color: "#1f2b12" }}>{buildActivityTitle(session)}</p>
+                      <p style={{ fontSize: 12, color: "#7b7d43", marginTop: 3 }}>
+                        {formatDistance(session.totalDistanceMeters)} walked | {formatDuration(session.durationSeconds)} | {session.stops.length} stop{session.stops.length === 1 ? "" : "s"}
+                      </p>
+                      {session.routeImageUrl ? (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setSelectedRoute({
+                              title: buildActivityTitle(session),
+                              imageUrl: session.routeImageUrl!,
+                            })
+                          }
+                          style={{
+                            marginTop: 8,
+                            padding: "7px 10px",
+                            borderRadius: 999,
+                            border: "1px solid rgba(185,207,81,0.34)",
+                            background: "rgba(244,216,77,0.14)",
+                            color: "#4d5c1e",
+                            fontSize: 11.5,
+                            fontWeight: 700,
+                          }}
+                        >
+                          View Route
+                        </button>
+                      ) : null}
+                    </div>
+                    <span style={{ fontSize: 12, color: "#a3955e", flexShrink: 0 }}>
+                      {new Date(session.startTime).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                    </span>
                   </div>
-                  <div style={{ flex: 1 }}>
-                    <p style={{ fontSize: 13.5, fontWeight: 600, color: "#1a1600" }}>{a.zone}</p>
-                    <p style={{ fontSize: 12, color: "#9a8a60", marginTop: 2 }}>{a.flyers} flyers distributed</p>
-                  </div>
-                  <span style={{ fontSize: 12, color: "#b0a070", flexShrink: 0 }}>{a.date}</span>
+                ))}
+              </div>
+            )}
+          </SectionCard>
+
+          <SectionCard
+            title="Leaderboard progress"
+            subtitle={myRankEntry ? `Rank #${myRankEntry.rank} of ${leaderboardEntries.length}` : "Your standing vs other volunteers"}
+          >
+            <div style={{ padding: "8px 0" }}>
+              {leaderboardLoading ? (
+                <p style={{ fontSize: 13, color: "#8a7a50" }}>Loading your ranking...</p>
+              ) : myRankEntry?.rank === 1 ? (
+                <div style={{ textAlign: "center", padding: "12px 0" }}>
+                  <p style={{ fontSize: 18, fontWeight: 700, color: "#1a1600", fontFamily: "'Fraunces', Georgia, serif", margin: 0 }}>
+                    You&rsquo;re the greatest volunteer
+                  </p>
+                  <p style={{ fontSize: 12, color: "#7a6a40", marginTop: 6 }}>
+                    #1 with {myRankEntry.flyers.toLocaleString()} flyers
+                  </p>
                 </div>
-              ))}
+              ) : myRankEntry && personAhead ? (
+                (() => {
+                  const targetFlyers = Math.max(1, personAhead.flyers);
+                  const myFlyers = myRankEntry.flyers;
+                  const progressPercent = Math.min(100, (myFlyers / targetFlyers) * 100);
+                  const remaining = Math.max(0, targetFlyers - myFlyers);
+                  return (
+                    <>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                        <span style={{ fontSize: 12, color: "#7a6a40" }}>You | {myFlyers.toLocaleString()} flyers</span>
+                        <span style={{ fontSize: 12, color: "#7a6a40" }}>{personAhead.username} #{personAhead.rank} | {personAhead.flyers.toLocaleString()} flyers</span>
+                      </div>
+                      <p style={{ fontSize: 11, color: "#9a8a60", marginBottom: 6 }}>
+                        Progress to match {personAhead.username}&rsquo;s flyers
+                      </p>
+                      <div style={{ height: 10, borderRadius: 99, background: "rgba(0,0,0,0.08)", overflow: "hidden" }}>
+                        <div
+                          style={{
+                            height: "100%",
+                            width: `${progressPercent}%`,
+                            borderRadius: 99,
+                            background: "linear-gradient(90deg,#e0c13a,#b9cf51)",
+                            boxShadow: "0 0 8px rgba(185,207,81,0.5)",
+                            transition: "width 0.3s ease",
+                          }}
+                        />
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6 }}>
+                        <span style={{ fontSize: 11, color: "#7a6a40" }}>
+                          {progressPercent.toFixed(0)}% of the way there
+                        </span>
+                        <span style={{ fontSize: 11, color: "#9a8a60" }}>
+                          {remaining.toLocaleString()} flyers left to match
+                        </span>
+                      </div>
+                      <p style={{ fontSize: 12, color: "#9a8a60", marginTop: 10 }}>
+                        <strong style={{ color: "#1a1600" }}>
+                          {Math.max(0, personAhead.flyers - myFlyers + 1).toLocaleString()} more flyers
+                        </strong>{" "}
+                        to reach rank #{personAhead.rank}
+                      </p>
+                    </>
+                  );
+                })()
+              ) : myRankEntry ? (
+                <p style={{ fontSize: 13, color: "#8a7a50" }}>You&rsquo;re on the board at rank #{myRankEntry.rank} with {myRankEntry.flyers.toLocaleString()} flyers.</p>
+              ) : (
+                <p style={{ fontSize: 13, color: "#8a7a50" }}>Complete route sessions to appear on the leaderboard.</p>
+              )}
             </div>
           </SectionCard>
 
-          {/* Progress to next rank */}
-          <SectionCard title="Progress to #3" subtitle="Keep going — you're almost there!">
-            <div style={{ padding: "8px 0" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-                <span style={{ fontSize: 12, color: "#7a6a40" }}>You · 340 flyers</span>
-                <span style={{ fontSize: 12, color: "#7a6a40" }}>Sofia #3 · 640 flyers</span>
-              </div>
-              <div style={{ height: 8, borderRadius: 99, background: "rgba(0,0,0,0.07)", overflow: "hidden" }}>
-                <div style={{ height: "100%", width: `${(340/640)*100}%`, borderRadius: 99, background: "linear-gradient(90deg,#f5c842,#fbbf24)", boxShadow: "0 0 8px rgba(245,200,66,0.5)" }} />
-              </div>
-              <p style={{ fontSize: 12, color: "#9a8a60", marginTop: 8 }}>
-                🔥 <strong style={{ color: "#1a1600" }}>300 more flyers</strong> to reach rank #3
+          <div
+            style={{
+              borderRadius: 18,
+              overflow: "hidden",
+              background: "linear-gradient(145deg, #f5e6b8 0%, #e8c547 35%, #d4a82b 100%)",
+              boxShadow: "0 0 32px rgba(212,168,43,0.4), 0 8px 24px rgba(0,0,0,0.12)",
+              border: "1px solid rgba(255,236,179,0.6)",
+              padding: "20px 18px",
+            }}
+          >
+            <div style={{ textAlign: "center", marginBottom: 14 }}>
+              <span style={{ fontSize: 32, lineHeight: 1, filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.2))" }}>📜</span>
+              <p
+                style={{
+                  margin: "10px 0 4px",
+                  fontFamily: "'Fraunces', Georgia, serif",
+                  fontSize: 18,
+                  fontWeight: 700,
+                  color: "#2d2208",
+                  letterSpacing: "-0.3px",
+                  textShadow: "0 1px 2px rgba(255,255,255,0.4)",
+                }}
+              >
+                Generate Certificate
+              </p>
+              <p style={{ fontSize: 11, color: "rgba(45,34,8,0.7)" }}>
+                {((badgesData?.flyers ?? 0) >= 1)
+                  ? "Download your volunteer certificate"
+                  : "Distribute at least 1 flyer to unlock"}
               </p>
             </div>
-          </SectionCard>
-
+            {certificateError && (
+              <p style={{ fontSize: 12, color: "#b91c1c", marginBottom: 8 }}>{certificateError}</p>
+            )}
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <button
+                type="button"
+                disabled={(badgesData?.flyers ?? 0) < 1 || certificateLoading !== "idle"}
+                onClick={async () => {
+                  if ((badgesData?.flyers ?? 0) < 1 || !user) return;
+                  setCertificateError(null);
+                  setCertificateLoading("pdf");
+                  try {
+                    const myEntry = user?.id ? leaderboardEntries.find((e) => e.id === user.id) : null;
+                    const hoursFromStats = myEntry?.hours ?? badgesData?.hours ?? 0;
+                    const hoursVolunteeredSeconds = Math.round(hoursFromStats * 3600);
+                    const blob = await generateCertificatePdf({
+                      fullName: displayName,
+                      flyersDistributed: badgesData?.flyers ?? 0,
+                      hoursVolunteeredSeconds,
+                      date: new Date(),
+                    });
+                    const dateStr = new Date().toISOString().slice(0, 10);
+                    downloadBlob(blob, `volunteer-certificate-${dateStr}.pdf`);
+                  } catch (e) {
+                    setCertificateError(e instanceof Error ? e.message : "Failed to generate certificate");
+                  } finally {
+                    setCertificateLoading("idle");
+                  }
+                }}
+                style={{
+                  width: "100%",
+                  padding: "12px 16px",
+                  borderRadius: 12,
+                  border: "1px solid rgba(45,34,8,0.25)",
+                  background: (badgesData?.flyers ?? 0) >= 1 && certificateLoading === "idle"
+                    ? "linear-gradient(180deg, #fff9e6 0%, #f5e6b8 100%)"
+                    : "rgba(0,0,0,0.12)",
+                  color: (badgesData?.flyers ?? 0) >= 1 && certificateLoading === "idle" ? "#2d2208" : "rgba(45,34,8,0.5)",
+                  fontSize: 13,
+                  fontWeight: 700,
+                  cursor: (badgesData?.flyers ?? 0) >= 1 && certificateLoading === "idle" ? "pointer" : "not-allowed",
+                  boxShadow: (badgesData?.flyers ?? 0) >= 1 && certificateLoading === "idle" ? "0 4px 16px rgba(212,168,43,0.35)" : "none",
+                }}
+              >
+                {certificateLoading === "pdf"
+                  ? "Generating…"
+                  : (badgesData?.flyers ?? 0) >= 1
+                    ? "Download certificate (PDF)"
+                    : "🔒 Locked"}
+              </button>
+              {(badgesData?.flyers ?? 0) >= 1 && (
+                <button
+                  type="button"
+                  disabled={certificateLoading !== "idle"}
+                  onClick={async () => {
+                    if (!user) return;
+                    setCertificateError(null);
+                    setCertificateLoading("png");
+                    try {
+                      const myEntry = user?.id ? leaderboardEntries.find((e) => e.id === user.id) : null;
+                      const hoursFromStats = myEntry?.hours ?? badgesData?.hours ?? 0;
+                      const hoursVolunteeredSeconds = Math.round(hoursFromStats * 3600);
+                      const blob = await generateCertificatePng({
+                        fullName: displayName,
+                        flyersDistributed: badgesData?.flyers ?? 0,
+                        hoursVolunteeredSeconds,
+                        date: new Date(),
+                      });
+                      const dateStr = new Date().toISOString().slice(0, 10);
+                      downloadBlob(blob, `volunteer-certificate-${dateStr}.png`);
+                    } catch (e) {
+                      setCertificateError(e instanceof Error ? e.message : "Failed to generate certificate");
+                    } finally {
+                      setCertificateLoading("idle");
+                    }
+                  }}
+                  style={{
+                    padding: "6px 12px",
+                    borderRadius: 8,
+                    border: "1px solid rgba(45,34,8,0.2)",
+                    background: "transparent",
+                    color: "rgba(45,34,8,0.85)",
+                    fontSize: 12,
+                    cursor: certificateLoading === "idle" ? "pointer" : "not-allowed",
+                  }}
+                >
+                  {certificateLoading === "png" ? "Generating…" : "Download as PNG"}
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       </div>
+
+      {selectedRoute ? (
+        <div
+          aria-hidden="true"
+          onClick={() => {
+            setSelectedRoute(null);
+            setRouteZoom(1);
+          }}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(22,30,10,0.72)",
+            padding: isMobile ? 16 : 28,
+            zIndex: 80,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <div
+            onClick={(event) => event.stopPropagation()}
+            style={{
+              width: "min(100%, 720px)",
+              borderRadius: 24,
+              overflow: "hidden",
+              background: "#fffdf2",
+              boxShadow: "0 24px 60px rgba(0,0,0,0.24)",
+              border: "1px solid rgba(185,207,81,0.22)",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 12,
+                padding: "14px 16px",
+                borderBottom: "1px solid rgba(190,155,70,0.16)",
+              }}
+            >
+              <div>
+                <p style={{ margin: 0, fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#8a8f51" }}>
+                  Route Preview
+                </p>
+                <p style={{ margin: "4px 0 0", fontSize: 15, fontWeight: 700, color: "#243112" }}>
+                  {selectedRoute.title}
+                </p>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <button
+                  type="button"
+                  onClick={() => setRouteZoom((current) => Math.max(1, current - 0.25))}
+                  style={zoomButtonStyle}
+                >
+                  -
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRouteZoom(1)}
+                  style={zoomButtonStyle}
+                >
+                  Reset
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRouteZoom((current) => Math.min(3, current + 0.25))}
+                  style={zoomButtonStyle}
+                >
+                  +
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedRoute(null);
+                    setRouteZoom(1);
+                  }}
+                  style={zoomButtonStyle}
+                >
+                  X
+                </button>
+              </div>
+            </div>
+            <div
+              style={{
+                maxHeight: "70vh",
+                overflow: "auto",
+                background: "#f7f3df",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: 16,
+              }}
+            >
+              <Image
+                src={selectedRoute.imageUrl}
+                alt={selectedRoute.title}
+                width={1280}
+                height={900}
+                unoptimized
+                style={{
+                  display: "block",
+                  width: `${routeZoom * 100}%`,
+                  height: "auto",
+                  maxWidth: "none",
+                  objectFit: "contain",
+                  transition: "width 150ms ease",
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      ) : null}
     </PageContainer>
   );
 }
+
+function readFileAsDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new Error("Failed to read photo."));
+    reader.readAsDataURL(file);
+  });
+}
+
+const zoomButtonStyle: React.CSSProperties = {
+  minWidth: 36,
+  height: 36,
+  padding: "0 10px",
+  borderRadius: 999,
+  border: "1px solid rgba(190,155,70,0.18)",
+  background: "#fffaf0",
+  color: "#42531d",
+  fontSize: 13,
+  fontWeight: 700,
+};

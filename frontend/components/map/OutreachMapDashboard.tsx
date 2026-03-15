@@ -4,7 +4,9 @@ import dynamic from "next/dynamic";
 import { useEffect, useEffectEvent, useState } from "react";
 
 const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5001";
+  process.env.NEXT_PUBLIC_API_BASE_URL ||
+  process.env.NEXT_PUBLIC_API_URL ||
+  "http://localhost:5001";
 
 export type MapHub = {
   id: string;
@@ -163,19 +165,14 @@ export default function OutreachMapDashboard() {
   const [locations, setLocations] = useState<MapLocation[]>([]);
   const [needRegions, setNeedRegions] = useState<MapNeedRegion[]>([]);
   const [selectedLocationId, setSelectedLocationId] = useState<string | null>(null);
-  const [activeHubId, setActiveHubId] = useState(hubs[0].id);
-  const [radiusMiles, setRadiusMiles] = useState(5);
   const [layers, setLayers] = useState<LayerVisibility>({
     recommended: true,
     uncovered: true,
     covered: false,
     regions: true,
   });
-  const [foodInsecurityCutoff, setFoodInsecurityCutoff] = useState(0.2);
-  const [minimumRegionSpots, setMinimumRegionSpots] = useState(10);
   const [viewport, setViewport] = useState<MapViewportState>({ zoom: 12, bounds: null });
   const [isLoading, setIsLoading] = useState(true);
-  const [isImporting, setIsImporting] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [showTools, setShowTools] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -188,8 +185,6 @@ export default function OutreachMapDashboard() {
     lng: hubs[0].lng,
     label: hubs[0].name,
   });
-
-  const activeHub = hubs.find((hub) => hub.id === activeHubId) ?? hubs[0];
 
   const locationsWithDistance: DistanceLocation[] = locations.map((location) => ({
     ...location,
@@ -206,8 +201,8 @@ export default function OutreachMapDashboard() {
     needRegions,
     regionLocationCounts,
     viewport.zoom,
-    foodInsecurityCutoff,
-    minimumRegionSpots,
+    0.2,
+    10,
   );
   const highlightedRegionCodes = new Set(highlightedRegions.map((region) => region.regionCode));
   const rankedLocations = rankLocations(
@@ -232,10 +227,6 @@ export default function OutreachMapDashboard() {
 
   const selectedLocation =
     rankedLocations.find((location) => location.id === selectedLocationId) || null;
-
-  const suggestedLocations = [...rankedLocations]
-    .filter((location) => location.distanceMiles <= radiusMiles)
-    .slice(0, 4);
 
   const runInitialLoad = useEffectEvent(() => {
     void loadStoredHotspots(true);
@@ -402,47 +393,7 @@ export default function OutreachMapDashboard() {
     }
   }
 
-  async function syncHotspots(silent = false) {
-    setIsImporting(true);
-    setErrorMessage(null);
-
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/locations/import/osm`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          lat: activeHub.lat,
-          lng: activeHub.lng,
-          radiusMiles,
-        }),
-      });
-
-      const payload = (await response.json()) as ImportResponse;
-
-      if (!response.ok || !payload.success || !payload.data) {
-        throw new Error(payload.message || "Failed to import hotspots from OSM");
-      }
-
-      await loadStoredHotspots();
-
-      if (!silent) {
-        setSyncMessage(
-          `Imported ${payload.data.importedCount} hotspots around ${activeHub.name}.`,
-        );
-      }
-    } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "Failed to import hotspots from OSM",
-      );
-    } finally {
-      setIsImporting(false);
-    }
-  }
-
   async function syncNycHotspots(silent = false) {
-    setIsImporting(true);
     setErrorMessage(null);
 
     try {
@@ -472,8 +423,6 @@ export default function OutreachMapDashboard() {
       setErrorMessage(
         error instanceof Error ? error.message : "Failed to import NYC hotspots from OSM",
       );
-    } finally {
-      setIsImporting(false);
     }
   }
 
@@ -521,8 +470,8 @@ export default function OutreachMapDashboard() {
     <div
       style={{
         position: "relative",
-        height: "calc(100vh - 64px)",
-        minHeight: 720,
+        height: "100%",
+        minHeight: 640,
         overflow: "hidden",
         background: "#dbe7dd",
       }}
@@ -557,19 +506,6 @@ export default function OutreachMapDashboard() {
           >
             {showTools ? "Close Tools" : "Map Tools"}
           </button>
-          <button
-            onClick={() => void syncNycHotspots()}
-            disabled={isImporting}
-            style={{
-              ...toolButtonStyle,
-              background: "linear-gradient(135deg, #f5c842 0%, #f59e0b 100%)",
-              color: "#1a1000",
-              border: "1px solid rgba(245,200,66,0.36)",
-              opacity: isImporting ? 0.72 : 1,
-            }}
-          >
-            {isImporting ? "Syncing NYC..." : "Sync NYC"}
-          </button>
         </div>
 
         {showTools && (
@@ -586,118 +522,6 @@ export default function OutreachMapDashboard() {
               pointerEvents: "auto",
             }}
           >
-            <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 10, marginBottom: 10 }}>
-              <select
-                value={activeHubId}
-                onChange={(event) => {
-                  const nextHubId = event.target.value;
-                  setActiveHubId(nextHubId);
-
-                  const nextHub = hubs.find((hub) => hub.id === nextHubId);
-                  if (nextHub) {
-                    setFocusRequest({
-                      key: Date.now(),
-                      lat: nextHub.lat,
-                      lng: nextHub.lng,
-                      zoom: 13,
-                    });
-                    setPriorityOrigin({
-                      lat: nextHub.lat,
-                      lng: nextHub.lng,
-                      label: nextHub.name,
-                    });
-                  }
-                }}
-                style={fieldStyle}
-              >
-                {hubs.map((hub) => (
-                  <option key={hub.id} value={hub.id}>
-                    {hub.name}
-                  </option>
-                ))}
-              </select>
-              <div style={{ minWidth: 76, borderRadius: 14, background: "#fff6d6", border: "1px solid rgba(245,200,66,0.35)", padding: "12px 12px", fontSize: 13, fontWeight: 700, color: "#8a5a00", textAlign: "center" }}>
-                {radiusMiles.toFixed(1)} mi
-              </div>
-            </div>
-
-            <div style={{ marginBottom: 10 }}>
-              <input
-                type="range"
-                min={1}
-                max={12}
-                step={0.5}
-                value={radiusMiles}
-                onChange={(event) => setRadiusMiles(Number(event.target.value))}
-                style={{ width: "100%" }}
-              />
-              <p style={{ fontSize: 11.5, color: "#8a7a50", marginTop: 6 }}>
-                Radius used for suggested stops and current-hub OSM imports.
-              </p>
-            </div>
-
-            <div style={{ marginBottom: 10 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", gap: 12, marginBottom: 6 }}>
-                <span style={{ fontSize: 11.5, color: "#8a7a50", fontWeight: 700 }}>
-                  Food insecurity cutoff
-                </span>
-                <span style={{ fontSize: 11.5, color: "#8a5a00", fontWeight: 800 }}>
-                  {formatPercent(foodInsecurityCutoff)}
-                </span>
-              </div>
-              <input
-                type="range"
-                min={0.08}
-                max={0.32}
-                step={0.01}
-                value={foodInsecurityCutoff}
-                onChange={(event) => setFoodInsecurityCutoff(Number(event.target.value))}
-                style={{ width: "100%" }}
-              />
-            </div>
-
-            <div style={{ marginBottom: 12 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", gap: 12, marginBottom: 6 }}>
-                <span style={{ fontSize: 11.5, color: "#8a7a50", fontWeight: 700 }}>
-                  Min spots per highlighted area
-                </span>
-                <span style={{ fontSize: 11.5, color: "#8a5a00", fontWeight: 800 }}>
-                  {minimumRegionSpots}
-                </span>
-              </div>
-              <input
-                type="range"
-                min={5}
-                max={20}
-                step={1}
-                value={minimumRegionSpots}
-                onChange={(event) => setMinimumRegionSpots(Number(event.target.value))}
-                style={{ width: "100%" }}
-              />
-              <p style={{ fontSize: 11.5, color: "#8a7a50", marginTop: 6 }}>
-                Sparse regions are skipped and replaced by the next highest-need region with enough spots.
-              </p>
-            </div>
-
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
-              <button
-                onClick={() => void syncHotspots()}
-                disabled={isImporting}
-                style={{
-                  padding: "7px 11px",
-                  borderRadius: 999,
-                  border: "1px solid rgba(245,200,66,0.28)",
-                  background: "#fff6d6",
-                  color: "#8a5a00",
-                  fontSize: 11.5,
-                  fontWeight: 700,
-                  opacity: isImporting ? 0.72 : 1,
-                }}
-              >
-                Sync Current Hub
-              </button>
-            </div>
-
             <div style={{ marginBottom: 12 }}>
               <p style={{ fontSize: 11.5, color: "#8a7a50", fontWeight: 700, marginBottom: 8 }}>
                 Map layers
@@ -737,7 +561,7 @@ export default function OutreachMapDashboard() {
                 })}
               </div>
               <p style={{ fontSize: 11.5, color: "#8a7a50", marginTop: 6 }}>
-                Default view shows top recommended spots and high-need regions first.
+                Default view shows recommended, uncovered, and high-need regions first.
               </p>
             </div>
 
@@ -881,7 +705,8 @@ export default function OutreachMapDashboard() {
           style={{
             position: "absolute",
             right: 18,
-            bottom: 18,
+            top: "50%",
+            transform: "translateY(-50%)",
             width: 310,
             maxWidth: "calc(100vw - 36px)",
             zIndex: 500,
@@ -929,11 +754,11 @@ export default function OutreachMapDashboard() {
               {selectedLocation.address}
             </p>
 
-            {selectedLocation.regionName && (
+            {selectedLocation.regionName ? (
               <p style={{ fontSize: 12, color: "rgba(245,200,66,0.82)", marginBottom: 10 }}>
-                {selectedLocation.regionName} · need score {selectedLocation.regionNeedScore?.toFixed(2)}
+                {selectedLocation.regionName}
               </p>
-            )}
+            ) : null}
 
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
               <span style={{ padding: "6px 10px", borderRadius: 999, background: selectedLocation.covered ? "rgba(34,197,94,0.16)" : "rgba(245,158,11,0.16)", color: selectedLocation.covered ? "#86efac" : "#fcd34d", fontSize: 11.5, fontWeight: 700 }}>
@@ -941,12 +766,6 @@ export default function OutreachMapDashboard() {
               </span>
               <span style={{ padding: "6px 10px", borderRadius: 999, background: priorityStyle[selectedLocation.derivedPriority].bg, color: "#fff7de", fontSize: 11.5, fontWeight: 700 }}>
                 {selectedLocation.derivedPriority} priority
-              </span>
-              <span style={{ padding: "6px 10px", borderRadius: 999, background: "rgba(255,255,255,0.07)", color: "rgba(255,247,222,0.76)", fontSize: 11.5, fontWeight: 700 }}>
-                {selectedLocation.distanceMiles.toFixed(1)} mi
-              </span>
-              <span style={{ padding: "6px 10px", borderRadius: 999, background: "rgba(255,255,255,0.07)", color: "rgba(255,247,222,0.76)", fontSize: 11.5, fontWeight: 700 }}>
-                Score {selectedLocation.priorityScore.toFixed(1)}
               </span>
             </div>
 
@@ -992,35 +811,6 @@ export default function OutreachMapDashboard() {
               </button>
             </div>
 
-            {suggestedLocations.length > 0 && (
-              <div style={{ marginTop: 12 }}>
-                <p style={{ fontSize: 11, letterSpacing: "0.08em", textTransform: "uppercase", color: "rgba(245,200,66,0.50)", marginBottom: 8 }}>
-                  Nearby suggestions
-                </p>
-                <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-                  {suggestedLocations.map((location) => (
-                    <button
-                      key={location.id}
-                      onClick={() => setSelectedLocationId(location.id)}
-                      style={{
-                        width: "100%",
-                        textAlign: "left",
-                        borderRadius: 14,
-                        padding: "10px 11px",
-                        background: location.id === selectedLocation.id ? "rgba(245,200,66,0.12)" : "rgba(255,255,255,0.05)",
-                        border: `1px solid ${location.id === selectedLocation.id ? "rgba(245,200,66,0.20)" : "rgba(255,255,255,0.06)"}`,
-                        color: "#fff7de",
-                      }}
-                    >
-                      <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-                        <span style={{ fontSize: 12, fontWeight: 700 }}>{location.name}</span>
-                        <span style={{ fontSize: 11, color: "rgba(245,200,66,0.70)" }}>{location.distanceMiles.toFixed(1)} mi</span>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
         </div>
       )}
@@ -1059,16 +849,6 @@ const toolButtonStyle: React.CSSProperties = {
   fontSize: 12,
   fontWeight: 800,
   backdropFilter: "blur(18px)",
-};
-
-const fieldStyle: React.CSSProperties = {
-  borderRadius: 14,
-  border: "1px solid rgba(190,155,70,0.18)",
-  background: "#ffffff",
-  padding: "12px 14px",
-  fontSize: 13,
-  color: "#1a1600",
-  outline: "none",
 };
 
 const statusChipStyle: React.CSSProperties = {
@@ -1384,11 +1164,6 @@ function getSearchZoom(query: string) {
   }
 
   return 15;
-}
-
-function formatPercent(value: number | null | undefined) {
-  if (!Number.isFinite(value)) return "--";
-  return `${(Number(value) * 100).toFixed(0)}%`;
 }
 
 function LegendItem({
