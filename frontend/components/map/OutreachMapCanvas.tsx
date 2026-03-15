@@ -6,12 +6,11 @@ import {
   MapContainer,
   Marker,
   Popup,
-  TileLayer,
   useMap,
   useMapEvents,
   ZoomControl,
 } from "react-leaflet";
-import { divIcon } from "leaflet";
+import { divIcon, tileLayer } from "leaflet";
 import type { LatLngExpression } from "leaflet";
 import type {
   MapFocusRequest,
@@ -144,6 +143,14 @@ function InitializeNycView() {
       duration: 0.8,
       padding: [36, 36],
     });
+
+    const timer = window.setTimeout(() => {
+      map.invalidateSize();
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
   }, [map]);
 
   return null;
@@ -195,10 +202,7 @@ export default function OutreachMapCanvas({
       zoomControl={false}
       style={{ height: "100%", width: "100%" }}
     >
-      <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/">CARTO</a>'
-        url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-      />
+      <BaseTileLayer />
       <ZoomControl position="topright" />
 
       <InitializeNycView />
@@ -233,6 +237,28 @@ export default function OutreachMapCanvas({
       />
     </MapContainer>
   );
+}
+
+function BaseTileLayer() {
+  const map = useMap();
+
+  useEffect(() => {
+    const layer = tileLayer(
+      "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+      {
+        attribution:
+          '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/">CARTO</a>',
+      },
+    );
+
+    layer.addTo(map);
+
+    return () => {
+      map.removeLayer(layer);
+    };
+  }, [map]);
+
+  return null;
 }
 
 function LocationMarkers({

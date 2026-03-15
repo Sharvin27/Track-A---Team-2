@@ -1,0 +1,297 @@
+import Link from "next/link";
+import PageContainer from "@/components/layout/PageContainer";
+import SectionCard from "@/components/common/SectionCard";
+
+const steps = [
+  {
+    step: "01",
+    emoji: "📖",
+    title: "Learn About Flyering",
+    desc: "Understand what food resource flyering is and how it connects neighbors to free food programs, pantries, and community fridges near them.",
+    action: "Read the Guide",
+    href: "/guide",
+    bg: "#fef9c3",
+    border: "#fde68a",
+    accent: "#d97706",
+  },
+  {
+    step: "02",
+    emoji: "📄",
+    title: "Download Your Flyers",
+    desc: "Get printable flyers customized for your neighborhood. Available in English and Spanish. Just enter your area and we'll generate the right flyer.",
+    action: "Get Flyers",
+    href: "https://www.foodhelpline.org/share",
+    bg: "#ede9fe",
+    border: "#ddd6fe",
+    accent: "#7c3aed",
+  },
+  {
+    step: "03",
+    emoji: "🖨️",
+    title: "Find a Nearby Printer",
+    desc: "Use our printer locator to find the cheapest and most convenient place to print your flyers — from Staples to your local library.",
+    action: "Find Printers",
+    href: "/printers",
+    bg: "#dcfce7",
+    border: "#bbf7d0",
+    accent: "#16a34a",
+  },
+  {
+    step: "04",
+    emoji: "🚶",
+    title: "Start Volunteering",
+    desc: "Head out to your assigned zone, distribute flyers to residents, businesses, and community boards. Log your activity to earn points!",
+    action: "View the Map",
+    href: "/map",
+    bg: "#fee2e2",
+    border: "#fecaca",
+    accent: "#dc2626",
+  },
+];
+
+const faqs = [
+  {
+    q: "Do I need any experience?",
+    a: "No experience needed! All you need is enthusiasm. We'll provide flyers, maps, and guidance.",
+  },
+  {
+    q: "How much time does it take?",
+    a: "Most volunteers spend 1–2 hours per session, on their own schedule.",
+  },
+  {
+    q: "Can I volunteer in another language?",
+    a: "Yes! Our flyers are available in English and Spanish. More languages coming soon.",
+  },
+  {
+    q: "What happens after I distribute flyers?",
+    a: "Log your activity to track your impact, earn badges, and show up on the leaderboard.",
+  },
+];
+
+export default function GetStartedPage() {
+  return (
+    <PageContainer>
+      <div
+        className="anim-fade-up d1"
+        style={{
+          position: "relative",
+          borderRadius: 20,
+          overflow: "hidden",
+          background: "linear-gradient(130deg, #f5c842 0%, #fbbf24 60%, #f59e0b 100%)",
+          boxShadow: "0 8px 32px rgba(245,200,66,0.35)",
+          padding: "48px 56px",
+          textAlign: "center",
+          marginBottom: 28,
+        }}
+      >
+        <div
+          style={{
+            position: "absolute",
+            top: -40,
+            right: -40,
+            width: 200,
+            height: 200,
+            borderRadius: "50%",
+            background: "rgba(255,255,255,0.12)",
+            pointerEvents: "none",
+          }}
+        />
+        <div
+          style={{
+            position: "absolute",
+            bottom: -50,
+            left: -30,
+            width: 160,
+            height: 160,
+            borderRadius: "50%",
+            background: "rgba(255,255,255,0.08)",
+            pointerEvents: "none",
+          }}
+        />
+        <div className="anim-float" style={{ fontSize: 52, marginBottom: 14, lineHeight: 1 }}>
+          🍋
+        </div>
+        <h2
+          style={{
+            fontFamily: "'Fraunces', Georgia, serif",
+            fontSize: 34,
+            fontWeight: 700,
+            color: "#1a1000",
+            letterSpacing: "-0.8px",
+            marginBottom: 10,
+          }}
+        >
+          Welcome to the Hub
+        </h2>
+        <p
+          style={{
+            fontSize: 14.5,
+            color: "rgba(60,40,0,0.65)",
+            maxWidth: 480,
+            margin: "0 auto",
+          }}
+        >
+          Flyering is one of the simplest ways to help. A single flyer can connect a family to food.
+          Here&apos;s how to get started in 4 easy steps.
+        </p>
+      </div>
+
+      <div
+        className="anim-fade-up d2"
+        style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 24 }}
+      >
+        {steps.map((step) => (
+          <div
+            key={step.step}
+            style={{
+              padding: "24px 26px",
+              borderRadius: 18,
+              background: step.bg,
+              border: `1.5px solid ${step.border}`,
+              boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "flex-start", gap: 16 }}>
+              <div
+                style={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: 14,
+                  background: "#ffffff",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 22,
+                  flexShrink: 0,
+                  boxShadow: "0 2px 8px rgba(0,0,0,0.07)",
+                }}
+              >
+                {step.emoji}
+              </div>
+              <div style={{ flex: 1 }}>
+                <p
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 700,
+                    letterSpacing: "0.14em",
+                    textTransform: "uppercase",
+                    color: step.accent,
+                    marginBottom: 5,
+                  }}
+                >
+                  STEP {step.step}
+                </p>
+                <h3
+                  style={{
+                    fontFamily: "'Fraunces', Georgia, serif",
+                    fontSize: 16.5,
+                    fontWeight: 700,
+                    color: "#1a1600",
+                    letterSpacing: "-0.3px",
+                    marginBottom: 8,
+                  }}
+                >
+                  {step.title}
+                </h3>
+                <p style={{ fontSize: 13, color: "#5a4a20", lineHeight: 1.6, marginBottom: 14 }}>
+                  {step.desc}
+                </p>
+                {step.href.startsWith("http") ? (
+                  <a
+                    href={step.href}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{ fontSize: 13, fontWeight: 600, color: step.accent, textDecoration: "none" }}
+                  >
+                    {step.action} →
+                  </a>
+                ) : (
+                  <Link
+                    href={step.href}
+                    style={{ fontSize: 13, fontWeight: 600, color: step.accent, textDecoration: "none" }}
+                  >
+                    {step.action} →
+                  </Link>
+                )}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <SectionCard
+        title="Common Questions"
+        subtitle="Everything you need to know before you start"
+        style={{ marginBottom: 24 }}
+      >
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px 40px" }}>
+          {faqs.map((faq, index) => (
+            <div
+              key={faq.q}
+              style={{
+                padding: "14px 0",
+                borderBottom: index < 2 ? "1px solid rgba(190,155,70,0.12)" : "none",
+              }}
+            >
+              <p style={{ fontSize: 13.5, fontWeight: 600, color: "#1a1600", marginBottom: 5 }}>
+                {faq.q}
+              </p>
+              <p style={{ fontSize: 13, color: "#7a6a40", lineHeight: 1.6 }}>{faq.a}</p>
+            </div>
+          ))}
+        </div>
+      </SectionCard>
+
+      <div
+        className="anim-fade-up d4"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "22px 32px",
+          borderRadius: 18,
+          background: "linear-gradient(120deg, #1a1200 55%, #2c1e00 100%)",
+          border: "1px solid rgba(245,200,66,0.14)",
+          boxShadow: "0 4px 24px rgba(0,0,0,0.14)",
+        }}
+      >
+        <div>
+          <h4
+            style={{
+              fontFamily: "'Fraunces', Georgia, serif",
+              fontSize: 16,
+              fontWeight: 700,
+              color: "#f5c842",
+              letterSpacing: "-0.3px",
+              marginBottom: 4,
+            }}
+          >
+            Ready to make a difference?
+          </h4>
+          <p style={{ fontSize: 12.5, color: "rgba(237,218,170,0.5)" }}>
+            Join 37 active volunteers and find your first flyering zone today.
+          </p>
+        </div>
+        <Link
+          href="/map"
+          style={{
+            flexShrink: 0,
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "11px 24px",
+            borderRadius: 12,
+            background: "#f5c842",
+            color: "#1a1000",
+            fontSize: 13,
+            fontWeight: 700,
+            boxShadow: "0 4px 16px rgba(245,200,66,0.32)",
+            textDecoration: "none",
+          }}
+        >
+          🗺️ Find My First Zone
+        </Link>
+      </div>
+    </PageContainer>
+  );
+}

@@ -13,7 +13,7 @@ const QUICK = [
   { href: "/map",         emoji: "🗺️", label: "Flyering Zones", desc: "Find where to distribute flyers today", bg: "#fef9c3", border: "#fde68a" },
   { href: "/printers",    emoji: "🖨️", label: "Find a Printer",  desc: "Locate nearby print shops",            bg: "#ede9fe", border: "#ddd6fe" },
   { href: "/leaderboard", emoji: "🏆", label: "Leaderboard",     desc: "See this month's top volunteers",      bg: "#dcfce7", border: "#bbf7d0" },
-  { href: "/onboarding",  emoji: "🚀", label: "New Volunteer?",  desc: "Get started in 4 easy steps",          bg: "#fce7f3", border: "#fbcfe8" },
+  { href: "/getstarted",  emoji: "🚀", label: "New Volunteer?",  desc: "Get started in 4 easy steps",          bg: "#fce7f3", border: "#fbcfe8" },
 ];
 
 const ACTIVITY = [
@@ -77,7 +77,7 @@ export default function HomePage() {
           </p>
           {/* Static link — no hover handlers needed on hero CTA */}
           <Link
-            href="/onboarding"
+            href="/getstarted"
             style={{
               display: "inline-flex", alignItems: "center", gap: 8,
               padding: "10px 22px", borderRadius: 11,

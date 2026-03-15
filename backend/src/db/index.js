@@ -1,6 +1,10 @@
 const { Pool } = require("pg");
 
 const connectionString = process.env.DATABASE_URL;
+if (!connectionString) {
+  throw new Error("DATABASE_URL is missing. Add it to backend/.env.local or backend/.env.");
+}
+
 const isSupabase = connectionString && connectionString.includes("supabase");
 const ssl =
   process.env.NODE_ENV === "production"
