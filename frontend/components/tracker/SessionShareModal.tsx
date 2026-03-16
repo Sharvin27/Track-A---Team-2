@@ -3,6 +3,7 @@
 import Image from "next/image";
 import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
+import SessionRoutePreview from "@/components/tracker/SessionRoutePreview";
 import { formatDistance } from "@/lib/distance";
 import { formatDuration, formatStopType } from "@/lib/session";
 import type { VolunteerSession } from "@/types/tracker";
@@ -246,6 +247,17 @@ export default function SessionShareModal({
             overflowY: "auto",
           }}
         >
+          <div
+            style={{
+              borderRadius: 15,
+              overflow: "hidden",
+              border: "1px solid rgba(190,155,70,0.16)",
+              background: "#f7f3df",
+            }}
+          >
+            <SessionRoutePreview session={session} height={contained ? 280 : 304} />
+          </div>
+
           {session.routeImageUrl ? (
             <div
               style={{
@@ -254,9 +266,8 @@ export default function SessionShareModal({
                 overflow: "hidden",
                 border: "1px solid rgba(190,155,70,0.16)",
                 background: "#f7f3df",
-                minHeight: 256,
-                height: "34vh",
-                maxHeight: 304,
+                minHeight: 130,
+                height: 150,
               }}
             >
               <Image

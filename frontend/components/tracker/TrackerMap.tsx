@@ -1,10 +1,16 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import mapboxgl, { GeoJSONSource } from "mapbox-gl";
 import type { RoutePoint, SessionStop } from "@/types/tracker";
 import type { SavedRouteItem } from "@/types/route-items";
+import {
+  getRouteEndPoint,
+  getRouteStartPoint,
+  normalizeRoutePoints,
+  normalizeSessionStops,
+} from "@/lib/tracker-route";
 
 interface TrackerMapProps {
   routePoints: RoutePoint[];
@@ -35,18 +41,31 @@ export default function TrackerMap({
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const currentMarkerRef = useRef<mapboxgl.Marker | null>(null);
+  const startMarkerRef = useRef<mapboxgl.Marker | null>(null);
+  const endMarkerRef = useRef<mapboxgl.Marker | null>(null);
   const stopMarkersRef = useRef<mapboxgl.Marker[]>([]);
   const plannedMarkersRef = useRef<mapboxgl.Marker[]>([]);
-  const latestRoutePointsRef = useRef<RoutePoint[]>(routePoints);
-  const latestStopsRef = useRef<SessionStop[]>(stops);
+  const normalizedRoutePoints = useMemo(() => normalizeRoutePoints(routePoints), [routePoints]);
+  const normalizedStops = useMemo(() => normalizeSessionStops(stops), [stops]);
+  const routeStartPoint = useMemo(
+    () => getRouteStartPoint(normalizedRoutePoints),
+    [normalizedRoutePoints],
+  );
+  const routeEndPoint = useMemo(
+    () => getRouteEndPoint(normalizedRoutePoints),
+    [normalizedRoutePoints],
+  );
+  const latestRoutePointsRef = useRef<RoutePoint[]>(normalizedRoutePoints);
+  const latestStopsRef = useRef<SessionStop[]>(normalizedStops);
   const latestCurrentPointRef = useRef<RoutePoint | null>(currentPoint);
   const [mapError, setMapError] = useState<string | null>(null);
+  const [isMapLoaded, setIsMapLoaded] = useState(false);
 
   useEffect(() => {
-    latestRoutePointsRef.current = routePoints;
-    latestStopsRef.current = stops;
+    latestRoutePointsRef.current = normalizedRoutePoints;
+    latestStopsRef.current = normalizedStops;
     latestCurrentPointRef.current = currentPoint;
-  }, [currentPoint, routePoints, stops]);
+  }, [currentPoint, normalizedRoutePoints, normalizedStops]);
 
   useEffect(() => {
     if (!mapContainerRef.current) {
@@ -70,6 +89,7 @@ export default function TrackerMap({
     mapRef.current = map;
 
     map.on("load", () => {
+      setIsMapLoaded(true);
       map.addSource("route", {
         type: "geojson",
         data: {
@@ -129,6 +149,7 @@ export default function TrackerMap({
     }
 
     return () => {
+      setIsMapLoaded(false);
       onSnapshotReady?.(null);
       if (onMapClick) {
         map.off("click", handleBackgroundClick);
@@ -138,6 +159,8 @@ export default function TrackerMap({
       plannedMarkersRef.current.forEach((marker) => marker.remove());
       plannedMarkersRef.current = [];
       currentMarkerRef.current?.remove();
+      startMarkerRef.current?.remove();
+      endMarkerRef.current?.remove();
       map.remove();
       mapRef.current = null;
     };
@@ -161,7 +184,7 @@ export default function TrackerMap({
   useEffect(() => {
     const map = mapRef.current;
 
-    if (!map || !map.isStyleLoaded()) {
+    if (!map || !isMapLoaded) {
       return;
     }
 
@@ -169,18 +192,24 @@ export default function TrackerMap({
 
     source?.setData({
       type: "Feature",
-      geometry: {
-        type: "LineString",
-        coordinates: routePoints.map((point) => [point.lng, point.lat]),
-      },
-      properties: {},
-    });
-  }, [routePoints]);
+        geometry: {
+          type: "LineString",
+          coordinates: normalizedRoutePoints.map((point) => [point.lng, point.lat]),
+        },
+        properties: {},
+      });
+  }, [isMapLoaded, normalizedRoutePoints]);
 
   useEffect(() => {
     const map = mapRef.current;
 
-    if (!map || !currentPoint) {
+    if (!map || !isMapLoaded) {
+      return;
+    }
+
+    if (!currentPoint) {
+      currentMarkerRef.current?.remove();
+      currentMarkerRef.current = null;
       return;
     }
 
@@ -206,17 +235,17 @@ export default function TrackerMap({
       duration: 500,
       essential: true,
     });
-  }, [currentPoint]);
+  }, [currentPoint, isMapLoaded]);
 
   useEffect(() => {
     const map = mapRef.current;
 
-    if (!map) {
+    if (!map || !isMapLoaded) {
       return;
     }
 
     stopMarkersRef.current.forEach((marker) => marker.remove());
-    stopMarkersRef.current = stops.map((stop) => {
+    stopMarkersRef.current = normalizedStops.map((stop) => {
       const element = document.createElement("div");
       element.style.width = "14px";
       element.style.height = "14px";
@@ -244,12 +273,68 @@ export default function TrackerMap({
         .setPopup(new mapboxgl.Popup({ offset: 18 }).setDOMContent(popupContent))
         .addTo(map);
     });
-  }, [stops]);
+  }, [isMapLoaded, normalizedStops]);
 
   useEffect(() => {
     const map = mapRef.current;
 
-    if (!map) {
+    if (!map || !isMapLoaded) {
+      return;
+    }
+
+    startMarkerRef.current?.remove();
+    startMarkerRef.current = null;
+    if (routeStartPoint) {
+      startMarkerRef.current = new mapboxgl.Marker({
+        element: createTerminalMarkerElement("#f8df5e", "#31401f", "S"),
+        anchor: "center",
+      })
+        .setLngLat([routeStartPoint.lng, routeStartPoint.lat])
+        .addTo(map);
+    }
+
+    endMarkerRef.current?.remove();
+    endMarkerRef.current = null;
+    const endPoint = currentPoint ?? routeEndPoint;
+    if (endPoint && (!currentPoint || normalizedRoutePoints.length > 1)) {
+      endMarkerRef.current = new mapboxgl.Marker({
+        element: createTerminalMarkerElement("#6f8f2f", "#fffdf2", "E"),
+        anchor: "center",
+      })
+        .setLngLat([endPoint.lng, endPoint.lat])
+        .addTo(map);
+    }
+  }, [currentPoint, isMapLoaded, normalizedRoutePoints.length, routeEndPoint, routeStartPoint]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+
+    if (!map || !isMapLoaded || currentPoint) {
+      return;
+    }
+
+    const bounds = buildBoundsFromPoints({
+      routePoints: normalizedRoutePoints,
+      stops: normalizedStops,
+      plannedItems,
+    });
+
+    if (!bounds) {
+      return;
+    }
+
+    map.fitBounds(bounds, {
+      padding: 72,
+      maxZoom: 15.5,
+      duration: 700,
+      essential: true,
+    });
+  }, [currentPoint, isMapLoaded, normalizedRoutePoints, normalizedStops, plannedItems]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+
+    if (!map || !isMapLoaded) {
       return;
     }
 
@@ -290,7 +375,7 @@ export default function TrackerMap({
         .addTo(map);
     });
 
-    if (!currentPoint && plannedItems.length > 0) {
+    if (!currentPoint && plannedItems.length > 0 && normalizedRoutePoints.length === 0) {
       const bounds = new mapboxgl.LngLatBounds();
       plannedItems.forEach((item) => bounds.extend([item.lng, item.lat]));
       map.fitBounds(bounds, {
@@ -299,7 +384,7 @@ export default function TrackerMap({
         duration: 800,
       });
     }
-  }, [currentPoint, onSelectPlannedItem, plannedItems]);
+  }, [currentPoint, isMapLoaded, normalizedRoutePoints.length, onSelectPlannedItem, plannedItems]);
 
   return (
     <div
@@ -463,7 +548,7 @@ async function captureRouteSnapshot({
     pitch: originalView.pitch,
   });
 
-  return snapshotCanvas.toDataURL("image/jpeg", 0.82);
+  return snapshotCanvas.toDataURL("image/png");
 }
 
 function drawRouteLine(
@@ -554,4 +639,47 @@ function waitForMapIdle(map: mapboxgl.Map) {
 
     map.once("idle", () => resolve());
   });
+}
+
+function createTerminalMarkerElement(fillColor: string, textColor: string, label: string) {
+  const element = document.createElement("div");
+  element.style.width = "28px";
+  element.style.height = "28px";
+  element.style.borderRadius = "999px";
+  element.style.background = fillColor;
+  element.style.border = "3px solid #fffdf2";
+  element.style.color = textColor;
+  element.style.display = "flex";
+  element.style.alignItems = "center";
+  element.style.justifyContent = "center";
+  element.style.fontSize = "11px";
+  element.style.fontWeight = "800";
+  element.style.boxShadow = "0 6px 16px rgba(49,64,31,0.24)";
+  element.textContent = label;
+  return element;
+}
+
+function buildBoundsFromPoints({
+  routePoints,
+  stops,
+  plannedItems,
+}: {
+  routePoints: RoutePoint[];
+  stops: SessionStop[];
+  plannedItems: SavedRouteItem[];
+}) {
+  const coordinates: [number, number][] = [
+    ...routePoints.map((point) => [point.lng, point.lat] as [number, number]),
+    ...stops.map((stop) => [stop.lng, stop.lat] as [number, number]),
+    ...plannedItems.map((item) => [item.lng, item.lat] as [number, number]),
+  ];
+
+  if (coordinates.length === 0) {
+    return null;
+  }
+
+  return coordinates.slice(1).reduce(
+    (bounds, coordinate) => bounds.extend(coordinate),
+    new mapboxgl.LngLatBounds(coordinates[0], coordinates[0]),
+  );
 }

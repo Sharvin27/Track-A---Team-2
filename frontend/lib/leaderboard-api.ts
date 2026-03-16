@@ -15,6 +15,7 @@ export type LeaderboardEntry = {
   total_distance_meters: number;
   total_stops: number;
   flyers: number;
+  scans: number;
   hours: number;
   rank: number;
   hours_rank?: number;
@@ -26,6 +27,7 @@ export type LeaderboardResponse = {
   data: LeaderboardEntry[];
   podium: LeaderboardEntry[];
   totalVolunteers?: number;
+  totalFlyers?: number;
   totalScans?: number;
   totalHours?: number;
 };

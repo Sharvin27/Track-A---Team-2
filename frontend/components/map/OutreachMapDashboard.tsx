@@ -11,12 +11,14 @@ import {
   deleteRouteItem,
   getRouteItems,
 } from "@/lib/route-items";
+import { submitHotspotCoverageProof } from "@/lib/hotspot-proof-api";
 import { useAuth } from "@/context/AuthContext";
 import type { SavedRouteItem, SavedRouteItemsResponse } from "@/types/route-items";
 import { useRouter } from "next/navigation";
 import { getMeetups, joinMeetup } from "@/lib/meetup-api";
 import { formatDateTimeRange } from "@/lib/social-format";
 import type { MeetupSummary } from "@/lib/social-types";
+import CoverageProofModal from "./CoverageProofModal";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ||
@@ -215,6 +217,8 @@ export default function OutreachMapDashboard() {
   const [isSearching, setIsSearching] = useState(false);
   const [isLoadingPrinters, setIsLoadingPrinters] = useState(false);
   const [isLoadingRouteItems, setIsLoadingRouteItems] = useState(false);
+  const [isCoverageProofModalOpen, setIsCoverageProofModalOpen] = useState(false);
+  const [isSubmittingCoverageProof, setIsSubmittingCoverageProof] = useState(false);
   const [isTrackerMode, setIsTrackerMode] = useState(false);
   const [showTools, setShowTools] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -319,6 +323,12 @@ export default function OutreachMapDashboard() {
 
     runRouteItemsLoad();
   }, [isGuest, token]);
+
+  useEffect(() => {
+    if (!selectedLocationId) {
+      setIsCoverageProofModalOpen(false);
+    }
+  }, [selectedLocationId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -653,6 +663,57 @@ export default function OutreachMapDashboard() {
       setErrorMessage(
         error instanceof Error ? error.message : "Failed to update hotspot",
       );
+    }
+  }
+
+  function updateHotspotInState(updatedHotspot: MapLocation) {
+    setLocations((current) =>
+      current.map((location) =>
+        location.id === updatedHotspot.id ? updatedHotspot : location,
+      ),
+    );
+  }
+
+  function openCoverageProofFlow() {
+    if (!selectedLocation) {
+      return;
+    }
+
+    if (!token || isGuest) {
+      setErrorMessage("Sign in with a full account to submit hotspot coverage proof.");
+      return;
+    }
+
+    setErrorMessage(null);
+    setIsCoverageProofModalOpen(true);
+  }
+
+  async function handleCoverageProofSubmit(photo: File, notes: string) {
+    if (!selectedLocation || !token || isGuest) {
+      throw new Error("Sign in with a full account to submit hotspot coverage proof.");
+    }
+
+    setIsSubmittingCoverageProof(true);
+
+    try {
+      const result = await submitHotspotCoverageProof(
+        token,
+        selectedLocation.id,
+        photo,
+        notes,
+      );
+
+      updateHotspotInState(result.hotspot);
+      setSyncMessage(`${result.hotspot.name} was marked covered with photo proof.`);
+      setErrorMessage(null);
+      setIsCoverageProofModalOpen(false);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to submit hotspot coverage proof.";
+      setErrorMessage(message);
+      throw error;
+    } finally {
+      setIsSubmittingCoverageProof(false);
     }
   }
 
@@ -1327,7 +1388,11 @@ export default function OutreachMapDashboard() {
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 10, marginTop: 10 }}>
               <button
-                onClick={() => void toggleCovered(selectedLocation.id, selectedLocation.covered)}
+                onClick={() =>
+                  selectedLocation.covered
+                    ? void toggleCovered(selectedLocation.id, selectedLocation.covered)
+                    : openCoverageProofFlow()
+                }
                 style={{
                   width: "100%",
                   borderRadius: 15,
@@ -1345,11 +1410,25 @@ export default function OutreachMapDashboard() {
               >
                 {selectedLocation.covered ? "Mark as uncovered" : "Mark hotspot as covered"}
               </button>
+
+              {!selectedLocation.covered && (!token || isGuest) ? (
+                <p style={{ margin: 0, fontSize: 11.5, color: "rgba(255,247,222,0.68)", lineHeight: 1.5 }}>
+                  Sign in with a full account to upload a proof photo and verify coverage.
+                </p>
+              ) : null}
             </div>
 
           </div>
         </div>
       ) : null}
+
+      <CoverageProofModal
+        hotspot={selectedLocation}
+        isOpen={isCoverageProofModalOpen}
+        isSubmitting={isSubmittingCoverageProof}
+        onClose={() => setIsCoverageProofModalOpen(false)}
+        onSubmit={handleCoverageProofSubmit}
+      />
 
       <div
         style={{

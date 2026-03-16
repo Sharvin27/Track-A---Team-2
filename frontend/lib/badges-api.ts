@@ -10,6 +10,7 @@ export type BadgesData = {
   top_5: boolean;
   top_1: boolean;
   flyers?: number;
+  scans?: number;
   hours?: number;
   rank?: number | null;
   streak_days?: number;
