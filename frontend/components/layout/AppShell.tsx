@@ -80,8 +80,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         minHeight: "100dvh",
         height: "100dvh",
         overflow: "hidden",
-        background:
-          "radial-gradient(ellipse at 15% 0%, rgba(245,200,66,0.15) 0%, transparent 50%), radial-gradient(ellipse at 85% 100%, rgba(245,170,40,0.10) 0%, transparent 50%), #fdf8e8",
+        background: "var(--bg-base)",
         fontFamily: "'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif",
         position: "relative",
         touchAction: "pan-y",

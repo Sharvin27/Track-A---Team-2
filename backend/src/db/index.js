@@ -1,5 +1,12 @@
+const fs = require("fs");
+const path = require("path");
 const { Pool } = require("pg");
 let pool;
+
+const communitySchemaPath = path.resolve(
+  __dirname,
+  "../../sql/community_meetups_chat.sql",
+);
 
 function getConnectionString() {
   return process.env.DATABASE_URL;
@@ -173,7 +180,19 @@ async function initDb() {
         id INT PRIMARY KEY REFERENCES users(id) ON UPDATE CASCADE ON DELETE CASCADE,
         flyers BIGINT NOT NULL DEFAULT 0,
         hours DOUBLE PRECISION NOT NULL DEFAULT 0,
+        scans BIGINT NOT NULL DEFAULT 0,
         updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      ALTER TABLE user_stats
+      ADD COLUMN IF NOT EXISTS scans BIGINT NOT NULL DEFAULT 0;
+
+      CREATE TABLE IF NOT EXISTS user_qrcodes (
+        id SERIAL PRIMARY KEY,
+        user_id INT NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+        slug TEXT NOT NULL UNIQUE,
+        target_url TEXT NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
 
       CREATE TABLE IF NOT EXISTS user_daily_activity (
@@ -185,7 +204,7 @@ async function initDb() {
       );
 
       CREATE INDEX IF NOT EXISTS idx_user_daily_activity_user_date
-        ON user_daily_activity (user_id, date DESC);
+      ON user_daily_activity (user_id, date DESC);
 
       CREATE INDEX IF NOT EXISTS idx_hotspot_locations_lat_lng ON hotspot_locations (lat, lng);
       CREATE INDEX IF NOT EXISTS idx_hotspot_locations_category ON hotspot_locations (category);
@@ -193,6 +212,10 @@ async function initDb() {
       CREATE INDEX IF NOT EXISTS idx_hotspot_locations_region_code ON hotspot_locations (region_code);
       CREATE INDEX IF NOT EXISTS idx_need_regions_score ON need_regions (food_need_score DESC);
     `);
+
+    if (fs.existsSync(communitySchemaPath)) {
+      await client.query(fs.readFileSync(communitySchemaPath, "utf8"));
+    }
   } finally {
     client.release();
   }
