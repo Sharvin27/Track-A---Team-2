@@ -1,8 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
 import { formatDisplayName, formatRelativeTime } from "@/lib/social-format";
 import { searchUsers, createOrGetThread } from "@/lib/messages-api";
 import type { SearchUser } from "@/lib/messages-api";
@@ -12,12 +10,14 @@ import UserIdentity from "../community/UserIdentity";
 export default function DMThreadList({
   threads,
   token,
+  activeThreadId,
+  onSelectThread,
 }: {
   threads: DMThread[];
   token?: string | null;
+  activeThreadId?: number;
+  onSelectThread: (id: number) => void;
 }) {
-  const pathname = usePathname();
-  const router = useRouter();
   const [showCompose, setShowCompose] = useState(false);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchUser[]>([]);
@@ -74,7 +74,7 @@ export default function DMThreadList({
       const res = await createOrGetThread(token, userId);
       setShowCompose(false);
       setQuery("");
-      router.push(`/messages/${res.data.id}`);
+      onSelectThread(res.data.id);
     } catch {
       // ignore
     } finally {
@@ -222,14 +222,17 @@ export default function DMThreadList({
       ) : (
         <div style={{ display: "grid", gap: 6 }}>
           {threads.map((thread) => {
-            const isActive = pathname === `/messages/${thread.id}`;
+            const isActive = activeThreadId === thread.id;
 
             return (
-              <Link
+              <button
                 key={thread.id}
-                href={`/messages/${thread.id}`}
+                type="button"
+                onClick={() => onSelectThread(thread.id)}
                 style={{
                   display: "block",
+                  width: "100%",
+                  textAlign: "left",
                   borderRadius: 12,
                   border: isActive
                     ? "1px solid rgba(245,200,66,0.30)"
@@ -237,7 +240,7 @@ export default function DMThreadList({
                   background: isActive ? "rgba(245,200,66,0.10)" : "#ffffff",
                   boxShadow: "0 2px 8px rgba(31,43,18,0.04)",
                   padding: "10px 12px",
-                  textDecoration: "none",
+                  cursor: "pointer",
                 }}
               >
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center" }}>
@@ -272,7 +275,7 @@ export default function DMThreadList({
                 <div style={{ marginTop: 4, fontSize: 10.5, color: "#8a7a50" }}>
                   {thread.lastMessageAt ? formatRelativeTime(thread.lastMessageAt) : "New thread"}
                 </div>
-              </Link>
+              </button>
             );
           })}
         </div>

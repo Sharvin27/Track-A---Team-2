@@ -66,12 +66,6 @@ const monthlyStatHighlights = [
   },
 ];
 
-const monthlyStats = [
-  { label: "Total Flyers", value: "4,554", icon: "FL" },
-  { label: "Active Volunteers", value: "37", icon: "AV" },
-  { label: "Zones Covered", value: "12", icon: "ZC" },
-  { label: "Avg Flyers / Vol.", value: "123", icon: "AVG" },
-];
 
 const podiumSlots = [
   { rank: 2, pos: -1.8, height: 1.4 },
@@ -153,18 +147,24 @@ export default function LeaderboardPage() {
   const [podiumEntries, setPodiumEntries] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [period, setPeriod] = useState<"all" | "month" | "week">("all");
+  const [totalVolunteers, setTotalVolunteers] = useState(0);
+  const [totalScansAll, setTotalScansAll] = useState(0);
+  const [totalHoursAll, setTotalHoursAll] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
 
     async function load() {
       try {
-        setLoading(true);
         setError(null);
-        const response = await getLeaderboard();
+        const response = await getLeaderboard(period);
         if (!cancelled) {
           setEntries(response.data);
           setPodiumEntries(response.podium ?? []);
+          setTotalVolunteers(response.totalVolunteers ?? 0);
+          setTotalScansAll(response.totalScans ?? 0);
+          setTotalHoursAll(response.totalHours ?? 0);
         }
       } catch (loadError) {
         if (!cancelled) {
@@ -182,7 +182,7 @@ export default function LeaderboardPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [period]);
 
   const displayRows = useMemo<DisplayRow[]>(() => {
     if (!entries.length) {
@@ -191,7 +191,7 @@ export default function LeaderboardPage() {
 
     const maxHours = Math.max(...entries.map((entry) => entry.hours ?? 0), 0.01);
 
-    return entries.map((entry) => {
+    return entries.slice(0, 10).map((entry) => {
       const hours = entry.hours ?? entry.total_duration_seconds / 3600;
       return {
         ...entry,
@@ -236,11 +236,22 @@ export default function LeaderboardPage() {
     [displayRows]
   );
 
+  const periodLabel = period === "week" ? "This Week's" : period === "month" ? "This Month's" : "All Time";
+
+  const computedStats = useMemo(() => {
+    return [
+      { label: "Total Scans", value: totalScansAll.toLocaleString(), icon: "SC" },
+      { label: "Active Volunteers", value: totalVolunteers.toLocaleString(), icon: "AV" },
+      { label: "Locations Covered", value: "12", icon: "LC" },
+      { label: "Total Hours", value: String(totalHoursAll), icon: "HR" },
+    ];
+  }, [totalScansAll, totalVolunteers, totalHoursAll]);
+
   const personAhead = yourIndex > 0 ? displayRows[yourIndex - 1] : null;
-  const yourHours = yourStanding ? hoursFromSeconds(yourStanding.total_duration_seconds) : 0;
-  const aheadHours = personAhead ? hoursFromSeconds(personAhead.total_duration_seconds) : yourHours;
+  const yourScans = yourStanding?.flyers ?? 0;
+  const aheadScans = personAhead?.flyers ?? yourScans;
   const progressToNext =
-    personAhead && aheadHours > 0 ? Math.min(100, (yourHours / aheadHours) * 100) : 100;
+    personAhead && aheadScans > 0 ? Math.min(100, (yourScans / aheadScans) * 100) : 100;
 
   if (user?.isGuest) {
     return (
@@ -300,27 +311,8 @@ export default function LeaderboardPage() {
                   Champions Podium
                 </h3>
                 <p style={{ fontSize: 12, color: "rgba(245,200,66,0.45)", marginTop: 2 }}>
-                  Ranked by volunteered hours
+                  {periodLabel} &middot; Ranked by scans
                 </p>
-              </div>
-              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                {podiumRows.map((row) => (
-                  <span
-                    key={row.rank}
-                    style={{
-                      fontSize: 11,
-                      fontWeight: 600,
-                      padding: "4px 10px",
-                      borderRadius: 20,
-                      background: "rgba(245,200,66,0.12)",
-                      color: "rgba(245,200,66,0.8)",
-                      border: "1px solid rgba(245,200,66,0.2)",
-                      boxShadow: `0 0 18px ${rankColors[row.rank] ?? "#f5c842"}33`,
-                    }}
-                  >
-                    #{row.rank} {row.avatar}
-                  </span>
-                ))}
               </div>
             </div>
           </div>
@@ -397,7 +389,7 @@ export default function LeaderboardPage() {
         </SectionCard>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <SectionCard dark title="Your Standing" subtitle="Live from saved route sessions">
+          <SectionCard dark title="Your Standing" subtitle={`${periodLabel} ranking`}>
             {loading ? (
               <p style={{ fontSize: 12.5, color: "rgba(245,200,66,0.56)" }}>
                 Loading your ranking...
@@ -424,11 +416,11 @@ export default function LeaderboardPage() {
                 <div style={{ marginTop: 4 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
                     <span style={{ fontSize: 11, color: "rgba(245,200,66,0.5)" }}>
-                      You | {yourStanding.hoursLabel}
+                      You | {yourScans.toLocaleString()} scans
                     </span>
                     <span style={{ fontSize: 11, color: "rgba(245,200,66,0.5)" }}>
                       {personAhead
-                        ? `${personAhead.username} | ${personAhead.hoursLabel}`
+                        ? `${personAhead.username} | ${aheadScans.toLocaleString()} scans`
                         : "Top position"}
                     </span>
                   </div>
@@ -459,20 +451,23 @@ export default function LeaderboardPage() {
                     }}
                   >
                     {personAhead
-                      ? `${Math.max(0, aheadHours - yourHours).toFixed(1)} more hours to move up`
+                      ? `${Math.max(0, aheadScans - yourScans).toLocaleString()} more scans to move up`
                       : "You are leading the board"}
                   </p>
                 </div>
               </>
             ) : (
-              <p style={{ fontSize: 12.5, color: "rgba(245,200,66,0.56)" }}>
-                Save route sessions to appear in the live ranking.
-              </p>
+              <div style={{ textAlign: "center", padding: "16px 0" }}>
+                <div style={{ fontSize: 32, marginBottom: 10 }}>🍋</div>
+                <p style={{ fontSize: 13, color: "rgba(245,200,66,0.65)", lineHeight: 1.5, maxWidth: 240, margin: "0 auto" }}>
+                  You&apos;re not in the top 10 yet. Keep volunteering to climb the ranks!
+                </p>
+              </div>
             )}
           </SectionCard>
 
-          <SectionCard title="Monthly Stats" style={{ flex: 1 }}>
-            {monthlyStats.map((stat, index) => (
+          <SectionCard title={`${periodLabel} Stats`} subtitle="Across all volunteers" style={{ flex: 1 }}>
+            {computedStats.map((stat, index) => (
               (() => {
                 const highlight =
                   monthlyStatHighlights[index] ?? monthlyStatHighlights[monthlyStatHighlights.length - 1];
@@ -488,9 +483,9 @@ export default function LeaderboardPage() {
                   borderRadius: 18,
                   background: highlight.background,
                   boxShadow: `${highlight.shadow}, inset 0 1px 0 rgba(255,255,255,0.6)`,
-                  marginBottom: index < monthlyStats.length - 1 ? 8 : 0,
+                  marginBottom: index < computedStats.length - 1 ? 8 : 0,
                   borderBottom:
-                    index < monthlyStats.length - 1 ? "1px solid rgba(190,155,70,0.06)" : "none",
+                    index < computedStats.length - 1 ? "1px solid rgba(190,155,70,0.06)" : "none",
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -531,26 +526,30 @@ export default function LeaderboardPage() {
 
       <SectionCard
         title="Full Rankings"
-        subtitle={`${displayRows.length || 0} volunteers | ranked by impact (hours + flyers)`}
+        subtitle={`Top ${displayRows.length || 0} volunteers | ranked by scans`}
         action={
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-            {["All Time", "This Month", "This Week"].map((tab, index) => (
-              <button
-                key={tab}
-                style={{
-                  fontSize: 11.5,
-                  padding: "5px 12px",
-                  borderRadius: 20,
-                  cursor: "pointer",
-                  border: `1px solid ${index === 0 ? "#f5c842" : "rgba(190,155,70,0.2)"}`,
-                  background: index === 0 ? "#fef9c3" : "transparent",
-                  color: index === 0 ? "#92400e" : "#9a8a60",
-                  fontWeight: index === 0 ? 600 : 400,
-                }}
-              >
-                {tab}
-              </button>
-            ))}
+            {([["All Time", "all"], ["This Month", "month"], ["This Week", "week"]] as const).map(([label, value]) => {
+              const isActive = period === value;
+              return (
+                <button
+                  key={value}
+                  onClick={() => setPeriod(value)}
+                  style={{
+                    fontSize: 11.5,
+                    padding: "5px 12px",
+                    borderRadius: 20,
+                    cursor: "pointer",
+                    border: `1px solid ${isActive ? "#f5c842" : "rgba(190,155,70,0.2)"}`,
+                    background: isActive ? "#fef9c3" : "transparent",
+                    color: isActive ? "#92400e" : "#9a8a60",
+                    fontWeight: isActive ? 600 : 400,
+                  }}
+                >
+                  {label}
+                </button>
+              );
+            })}
           </div>
         }
       >
@@ -563,14 +562,14 @@ export default function LeaderboardPage() {
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "44px minmax(180px, 1fr) 200px 90px 70px",
+                gridTemplateColumns: "44px minmax(180px, 1fr) 90px 70px",
                 gap: 12,
                 padding: "0 10px 10px",
                 borderBottom: "1px solid rgba(190,155,70,0.15)",
-                minWidth: 600,
+                minWidth: 400,
               }}
             >
-              {["#", "Volunteer", "Progress", "Flyers", "Hours"].map((heading) => (
+              {["#", "Volunteer", "Scans", "Hours"].map((heading) => (
                 <span
                   key={heading}
                   style={{
@@ -614,7 +613,7 @@ export default function LeaderboardPage() {
                 style={{
                   animationDelay: `${0.3 + index * 0.06}s`,
                   display: "grid",
-                  gridTemplateColumns: "44px minmax(180px, 1fr) 200px 90px 70px",
+                  gridTemplateColumns: "44px minmax(180px, 1fr) 90px 70px",
                   gap: 12,
                   alignItems: "center",
                   padding: "10px 10px",
@@ -629,7 +628,7 @@ export default function LeaderboardPage() {
                   border: rowBorder,
                   boxShadow: topThreeBackground ? `0 10px 24px ${rankColors[volunteer.rank]}18` : "none",
                   marginBottom: 3,
-                  minWidth: 600,
+                  minWidth: 400,
                 }}
               >
                 <div style={{ textAlign: "center" }}>
@@ -724,42 +723,7 @@ export default function LeaderboardPage() {
                         </span>
                       ) : null}
                     </p>
-                    <p style={{ fontSize: 11, color: "#9a8a60", marginTop: 1 }}>
-                      {volunteer.flyers.toLocaleString()} flyers | {volunteer.hoursLabel}
-                    </p>
                   </div>
-                </div>
-
-                <div>
-                  <div
-                    style={{
-                      height: 5,
-                      borderRadius: 99,
-                      background: "rgba(0,0,0,0.07)",
-                      overflow: "hidden",
-                    }}
-                  >
-                    <div
-                      style={{
-                        height: "100%",
-                        width: `${volunteer.progressPercent}%`,
-                        borderRadius: 99,
-                        background:
-                          volunteer.rank === 1
-                            ? "linear-gradient(90deg,#f5c842,#fbbf24)"
-                            : volunteer.rank === 2
-                              ? "linear-gradient(90deg,#9ca3af,#d1d5db)"
-                              : volunteer.rank === 3
-                                ? "linear-gradient(90deg,#b45309,#d97706)"
-                                : volunteer.isYou
-                                  ? "linear-gradient(90deg,#f5c842,#fde68a)"
-                                  : "linear-gradient(90deg,#c4b89a,#d4c8aa)",
-                      }}
-                    />
-                  </div>
-                  <p style={{ fontSize: 10, color: "#b0a070", marginTop: 3 }}>
-                    {volunteer.hoursLabel}
-                  </p>
                 </div>
 
                 <span
