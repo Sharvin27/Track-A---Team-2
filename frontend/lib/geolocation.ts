@@ -34,6 +34,13 @@ export function getGeolocationErrorMessage(error: GeolocationPositionError) {
   }
 }
 
+export function isRecoverableGeolocationError(error: GeolocationPositionError) {
+  return (
+    error.code === error.POSITION_UNAVAILABLE ||
+    error.code === error.TIMEOUT
+  );
+}
+
 export function shouldAppendRoutePoint(points: RoutePoint[], nextPoint: RoutePoint) {
   if (
     typeof nextPoint.accuracy === "number" &&

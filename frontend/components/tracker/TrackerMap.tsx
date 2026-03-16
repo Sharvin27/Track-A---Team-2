@@ -25,6 +25,8 @@ interface TrackerMapProps {
 }
 
 const FALLBACK_CENTER: [number, number] = [-73.9857, 40.7484];
+const MAX_CONNECTED_GAP_SECONDS = 90;
+const MIN_SEGMENT_BREAK_DISTANCE_METERS = 60;
 
 export default function TrackerMap({
   routePoints,
@@ -94,7 +96,7 @@ export default function TrackerMap({
         data: {
           type: "Feature",
           geometry: {
-            type: "LineString",
+            type: "MultiLineString",
             coordinates: [],
           },
           properties: {},
@@ -192,12 +194,12 @@ export default function TrackerMap({
 
     source?.setData({
       type: "Feature",
-        geometry: {
-          type: "LineString",
-          coordinates: normalizedRoutePoints.map((point) => [point.lng, point.lat]),
-        },
-        properties: {},
-      });
+      geometry: {
+        type: "MultiLineString",
+        coordinates: buildRouteSegments(normalizedRoutePoints),
+      },
+      properties: {},
+    });
   }, [isMapLoaded, normalizedRoutePoints]);
 
   useEffect(() => {
@@ -584,27 +586,30 @@ function drawRouteLine(
   map: mapboxgl.Map,
   routePoints: RoutePoint[]
 ) {
-  if (routePoints.length < 2) {
+  const segments = buildRouteSegments(routePoints);
+  if (segments.length === 0) {
     return;
   }
 
   context.save();
-  context.beginPath();
-  routePoints.forEach((point, index) => {
-    const projected = map.project([point.lng, point.lat]);
-    if (index === 0) {
-      context.moveTo(projected.x, projected.y);
-    } else {
-      context.lineTo(projected.x, projected.y);
-    }
-  });
   context.strokeStyle = "#f4d03f";
   context.lineWidth = 7;
   context.lineJoin = "round";
   context.lineCap = "round";
   context.shadowColor = "rgba(49,64,31,0.26)";
   context.shadowBlur = 12;
-  context.stroke();
+  segments.forEach((segment) => {
+    context.beginPath();
+    segment.forEach((coordinate, index) => {
+      const projected = map.project(coordinate);
+      if (index === 0) {
+        context.moveTo(projected.x, projected.y);
+      } else {
+        context.lineTo(projected.x, projected.y);
+      }
+    });
+    context.stroke();
+  });
   context.restore();
 }
 
@@ -721,4 +726,47 @@ function buildBoundsFromPoints({
     (bounds, coordinate) => bounds.extend(coordinate),
     new mapboxgl.LngLatBounds(coordinates[0], coordinates[0]),
   );
+}
+
+function buildRouteSegments(routePoints: RoutePoint[]) {
+  const segments: Array<Array<[number, number]>> = [];
+  let currentSegment: Array<[number, number]> = [];
+  let previousPoint: RoutePoint | null = null;
+
+  for (const point of routePoints) {
+    const coordinate: [number, number] = [point.lng, point.lat];
+
+    if (!previousPoint) {
+      currentSegment.push(coordinate);
+      previousPoint = point;
+      continue;
+    }
+
+    const elapsedSeconds = Math.max(
+      0,
+      (Date.parse(point.timestamp) - Date.parse(previousPoint.timestamp)) / 1000,
+    );
+    const distanceMeters = haversineDistanceMeters(previousPoint, point);
+    const shouldBreakSegment =
+      elapsedSeconds > MAX_CONNECTED_GAP_SECONDS &&
+      distanceMeters > MIN_SEGMENT_BREAK_DISTANCE_METERS;
+
+    if (shouldBreakSegment) {
+      if (currentSegment.length > 1) {
+        segments.push(currentSegment);
+      }
+      currentSegment = [coordinate];
+      previousPoint = point;
+      continue;
+    }
+
+    currentSegment.push(coordinate);
+    previousPoint = point;
+  }
+
+  if (currentSegment.length > 1) {
+    segments.push(currentSegment);
+  }
+
+  return segments;
 }

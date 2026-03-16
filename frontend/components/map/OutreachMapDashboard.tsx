@@ -905,6 +905,7 @@ export default function OutreachMapDashboard() {
   }
 
   const mobileFloatingBottom = "max(88px, calc(env(safe-area-inset-bottom) + 18px))";
+  const mobileDetailPanelBottom = `calc(${mobileFloatingBottom} + 64px)`;
 
   if (isTrackerMode) {
     return (
@@ -1232,11 +1233,13 @@ export default function OutreachMapDashboard() {
         <div
           style={{
             position: "absolute",
-            right: 18,
-            top: "50%",
-            transform: "translateY(-50%)",
-            width: 326,
-            maxWidth: "calc(100vw - 36px)",
+            right: isMobile ? 12 : 18,
+            left: isMobile ? 12 : "auto",
+            top: isMobile ? "auto" : "50%",
+            bottom: isMobile ? mobileDetailPanelBottom : "auto",
+            transform: isMobile ? "none" : "translateY(-50%)",
+            width: isMobile ? "auto" : 326,
+            maxWidth: isMobile ? "none" : "calc(100vw - 36px)",
             zIndex: 500,
             pointerEvents: "none",
           }}
@@ -1251,6 +1254,8 @@ export default function OutreachMapDashboard() {
               color: "#effff3",
               backdropFilter: "blur(18px)",
               boxShadow: "0 22px 40px rgba(10,28,18,0.28)",
+              maxHeight: isMobile ? "min(52dvh, 460px)" : "none",
+              overflowY: isMobile ? "auto" : "visible",
             }}
           >
             <div style={{ display: "flex", justifyContent: "space-between", gap: 12, marginBottom: 10 }}>
@@ -1344,11 +1349,13 @@ export default function OutreachMapDashboard() {
         <div
           style={{
             position: "absolute",
-            right: 18,
-            top: "50%",
-            transform: "translateY(-50%)",
-            width: 310,
-            maxWidth: "calc(100vw - 36px)",
+            right: isMobile ? 12 : 18,
+            left: isMobile ? 12 : "auto",
+            top: isMobile ? "auto" : "50%",
+            bottom: isMobile ? mobileDetailPanelBottom : "auto",
+            transform: isMobile ? "none" : "translateY(-50%)",
+            width: isMobile ? "auto" : 310,
+            maxWidth: isMobile ? "none" : "calc(100vw - 36px)",
             zIndex: 500,
             pointerEvents: "none",
           }}
@@ -1363,6 +1370,8 @@ export default function OutreachMapDashboard() {
               color: "#fff7de",
               backdropFilter: "blur(18px)",
               boxShadow: "0 22px 40px rgba(17,14,6,0.24)",
+              maxHeight: isMobile ? "min(56dvh, 520px)" : "none",
+              overflowY: isMobile ? "auto" : "visible",
             }}
           >
             <div style={{ display: "flex", justifyContent: "space-between", gap: 12, marginBottom: 10 }}>
@@ -1413,7 +1422,7 @@ export default function OutreachMapDashboard() {
               {selectedLocation.notes}
             </p>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 10 }}>
               <button
                 onClick={() => openGoogleMapsLocation(selectedLocation)}
                 style={{

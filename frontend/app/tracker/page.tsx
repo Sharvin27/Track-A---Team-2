@@ -13,6 +13,7 @@ import { calculateRouteDistanceMeters, formatDistance } from "@/lib/distance";
 import {
   createRoutePoint,
   getGeolocationErrorMessage,
+  isRecoverableGeolocationError,
   requestCurrentPosition,
   shouldAppendRoutePoint,
   startLocationWatch,
@@ -38,6 +39,8 @@ const API_BASE_URL =
     process.env.NEXT_PUBLIC_API_URL ||
     "http://localhost:5001"
   ).replace(/\/$/, "");
+
+const TRACKER_SESSION_DRAFT_STORAGE_KEY = "lemontree.tracker.active-session";
 
 export default function TrackerPage() {
   const { token, isGuest } = useAuth();
@@ -91,6 +94,96 @@ export default function TrackerPage() {
     return () => mediaQuery.removeEventListener("change", updateViewport);
   }, []);
 
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const draft = window.localStorage.getItem(TRACKER_SESSION_DRAFT_STORAGE_KEY);
+    if (!draft) {
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(draft) as VolunteerSession;
+      if (parsed?.status === "tracking") {
+        const normalized = normalizeVolunteerSession(parsed);
+        setActiveSession(normalized);
+        setCurrentPoint(normalized.routePoints[normalized.routePoints.length - 1] ?? null);
+        setStatusMessage("Resumed active route session.");
+      }
+    } catch {
+      window.localStorage.removeItem(TRACKER_SESSION_DRAFT_STORAGE_KEY);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    if (activeSession?.status === "tracking") {
+      window.localStorage.setItem(
+        TRACKER_SESSION_DRAFT_STORAGE_KEY,
+        JSON.stringify(activeSession),
+      );
+      return;
+    }
+
+    window.localStorage.removeItem(TRACKER_SESSION_DRAFT_STORAGE_KEY);
+  }, [activeSession]);
+
+  useEffect(() => {
+    if (typeof document === "undefined" || !isTracking) {
+      return;
+    }
+
+    const ensureTrackingIsLive = () => {
+      if (document.visibilityState !== "visible") {
+        return;
+      }
+
+      if (watchIdRef.current === null) {
+        try {
+          watchIdRef.current = startLocationWatch(handlePosition, handlePositionError);
+        } catch (error) {
+          setErrorMessage(
+            error instanceof Error ? error.message : "Could not resume geolocation tracking.",
+          );
+        }
+      }
+
+      void requestCurrentPosition({ enableHighAccuracy: true, maximumAge: 5000, timeout: 12000 })
+        .then((position) => {
+          handlePosition(position);
+        })
+        .catch((error: GeolocationPositionError | Error) => {
+          if (error && "code" in error && isRecoverableGeolocationError(error)) {
+            setStatusMessage("Waiting for GPS signal to resume...");
+            return;
+          }
+
+          setErrorMessage(
+            error instanceof Error ? error.message : "Could not refresh your location.",
+          );
+        });
+    };
+
+    const handleVisibilityChange = () => {
+      ensureTrackingIsLive();
+    };
+
+    window.addEventListener("focus", ensureTrackingIsLive);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    ensureTrackingIsLive();
+
+    return () => {
+      window.removeEventListener("focus", ensureTrackingIsLive);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [isTracking]);
+
   const liveStats = useMemo(() => {
     if (!normalizedActiveSession) {
       return {
@@ -118,7 +211,9 @@ export default function TrackerPage() {
     const nextPoint = createRoutePoint(position);
     setErrorMessage(null);
     setStatusMessage("Tracking live route.");
+    setCurrentPoint(nextPoint);
     let acceptedPoint = false;
+    let insertedFallbackPoint = false;
 
     setActiveSession((current) => {
       if (!current) {
@@ -126,7 +221,11 @@ export default function TrackerPage() {
       }
 
       acceptedPoint = shouldAppendRoutePoint(current.routePoints, nextPoint);
-      const nextRoutePoints = acceptedPoint ? [...current.routePoints, nextPoint] : current.routePoints;
+      insertedFallbackPoint = !acceptedPoint && current.routePoints.length === 0;
+      const nextRoutePoints =
+        acceptedPoint || insertedFallbackPoint
+          ? [...current.routePoints, nextPoint]
+          : current.routePoints;
 
       return {
         ...current,
@@ -134,13 +233,15 @@ export default function TrackerPage() {
         totalDistanceMeters: calculateRouteDistanceMeters(nextRoutePoints),
       };
     });
-
-    if (acceptedPoint) {
-      setCurrentPoint(nextPoint);
-    }
   }
 
   function handlePositionError(error: GeolocationPositionError) {
+    if (isRecoverableGeolocationError(error)) {
+      setErrorMessage(getGeolocationErrorMessage(error));
+      setStatusMessage("Waiting for GPS signal...");
+      return;
+    }
+
     stopLocationWatch(watchIdRef.current);
     watchIdRef.current = null;
     setActiveSession(null);
@@ -206,9 +307,13 @@ export default function TrackerPage() {
     const routeImageUrl = (await captureSnapshotRef.current?.()) ?? undefined;
     const completedSession = routeImageUrl ? { ...completed, routeImageUrl } : completed;
     setActiveSession(null);
+    setCurrentPoint(null);
     setLastCompletedSession(completedSession);
     setIsShareOpen(true);
     setStatusMessage("Session stopped. Summary ready.");
+    if (typeof window !== "undefined") {
+      window.localStorage.removeItem(TRACKER_SESSION_DRAFT_STORAGE_KEY);
+    }
 
     try {
       setSaveError(null);
