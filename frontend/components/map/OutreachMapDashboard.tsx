@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useCallback, useEffect, useEffectEvent, useRef, useState } from "react";
+import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import {
   fetchPrinters,
   type Printer,
@@ -189,6 +189,7 @@ const priorityStyle = {
 };
 
 const HOTSPOT_REVEAL_ZOOM = 15;
+const HOTSPOT_FETCH_LIMIT = 8000;
 
 export default function OutreachMapDashboard() {
   const router = useRouter();
@@ -249,54 +250,99 @@ export default function OutreachMapDashboard() {
     });
   }, []);
 
-  const locationsWithDistance: DistanceLocation[] = locations.map((location) => ({
-    ...location,
-    distanceMiles: getDistanceMiles(
-      priorityOrigin.lat,
-      priorityOrigin.lng,
-      location.lat,
-      location.lng,
-    ),
-  }));
+  const locationsWithDistance: DistanceLocation[] = useMemo(
+    () =>
+      locations.map((location) => ({
+        ...location,
+        distanceMiles: getDistanceMiles(
+          priorityOrigin.lat,
+          priorityOrigin.lng,
+          location.lat,
+          location.lng,
+        ),
+      })),
+    [locations, priorityOrigin.lat, priorityOrigin.lng],
+  );
 
-  const regionLocationCounts = getRegionLocationCounts(locationsWithDistance);
-  const highlightedRegions = getHighlightedRegions(
-    needRegions,
-    regionLocationCounts,
-    viewport.zoom,
-    0.2,
-    10,
+  const regionLocationCounts = useMemo(
+    () => getRegionLocationCounts(locationsWithDistance),
+    [locationsWithDistance],
   );
-  const highlightedRegionCodes = new Set(highlightedRegions.map((region) => region.regionCode));
-  const rankedLocations = rankLocations(
-    locationsWithDistance,
-    highlightedRegionCodes,
-    regionLocationCounts,
+  const highlightedRegions = useMemo(
+    () =>
+      getHighlightedRegions(
+        needRegions,
+        regionLocationCounts,
+        viewport.zoom,
+        0.2,
+        10,
+      ),
+    [needRegions, regionLocationCounts, viewport.zoom],
   );
-  const recommendedTargetCount = Math.max(
-    1,
-    Math.round(locationsWithDistance.length * 0.2),
+  const highlightedRegionCodes = useMemo(
+    () => new Set(highlightedRegions.map((region) => region.regionCode)),
+    [highlightedRegions],
   );
-  const recommendedLocations = rankedLocations.filter((location) =>
-    isRecommendedLocation(location, highlightedRegionCodes),
-  ).slice(0, recommendedTargetCount);
-  const layeredLocations = getLayeredLocations(rankedLocations, recommendedLocations, layers);
-  const recommendedLocationIds = recommendedLocations.map((location) => location.id);
-  const visibleLocations = getVisibleLocations(
-    rankLocations(layeredLocations, highlightedRegionCodes, regionLocationCounts),
-    viewport,
-    highlightedRegionCodes,
+  const rankedLocations = useMemo(
+    () =>
+      rankLocations(
+        locationsWithDistance,
+        highlightedRegionCodes,
+        regionLocationCounts,
+      ),
+    [highlightedRegionCodes, locationsWithDistance, regionLocationCounts],
   );
-  const visibleMeetups = layers.meetups ? getVisibleMeetups(meetups, viewport) : [];
+  const recommendedTargetCount = useMemo(
+    () => Math.max(1, Math.round(locationsWithDistance.length * 0.2)),
+    [locationsWithDistance.length],
+  );
+  const recommendedLocations = useMemo(
+    () =>
+      rankedLocations
+        .filter((location) => isRecommendedLocation(location, highlightedRegionCodes))
+        .slice(0, recommendedTargetCount),
+    [highlightedRegionCodes, rankedLocations, recommendedTargetCount],
+  );
+  const layeredLocations = useMemo(
+    () => getLayeredLocations(rankedLocations, recommendedLocations, layers),
+    [layers, rankedLocations, recommendedLocations],
+  );
+  const recommendedLocationIds = useMemo(
+    () => recommendedLocations.map((location) => location.id),
+    [recommendedLocations],
+  );
+  const layeredRankedLocations = useMemo(
+    () => rankLocations(layeredLocations, highlightedRegionCodes, regionLocationCounts),
+    [highlightedRegionCodes, layeredLocations, regionLocationCounts],
+  );
+  const visibleLocations = useMemo(
+    () => getVisibleLocations(layeredRankedLocations, viewport, highlightedRegionCodes),
+    [highlightedRegionCodes, layeredRankedLocations, viewport],
+  );
+  const visibleMeetups = useMemo(
+    () => (layers.meetups ? getVisibleMeetups(meetups, viewport) : []),
+    [layers.meetups, meetups, viewport],
+  );
 
-  const selectedLocation =
-    rankedLocations.find((location) => location.id === selectedLocationId) || null;
-  const routeItemByDedupeKey = new Map(routeItems.map((item) => [item.dedupeKey, item]));
+  const selectedLocation = useMemo(
+    () => rankedLocations.find((location) => location.id === selectedLocationId) || null,
+    [rankedLocations, selectedLocationId],
+  );
+  const routeItemByDedupeKey = useMemo(
+    () => new Map(routeItems.map((item) => [item.dedupeKey, item])),
+    [routeItems],
+  );
+  const routeItemDedupeKeys = useMemo(
+    () => new Set(routeItems.map((item) => item.dedupeKey)),
+    [routeItems],
+  );
   const selectedLocationRouteItem = selectedLocation
     ? routeItemByDedupeKey.get(getHotspotRouteDedupeKey(selectedLocation))
     : null;
-  const selectedMeetup =
-    meetups.find((meetup) => Number(meetup.id) === Number(selectedMeetupId)) || null;
+  const selectedMeetup = useMemo(
+    () => meetups.find((meetup) => Number(meetup.id) === Number(selectedMeetupId)) || null,
+    [meetups, selectedMeetupId],
+  );
 
   const runInitialLoad = useEffectEvent(() => {
     void loadStoredHotspots(true);
@@ -422,7 +468,7 @@ export default function OutreachMapDashboard() {
 
     try {
       const params = new URLSearchParams({
-        limit: "15000",
+        limit: String(HOTSPOT_FETCH_LIMIT),
       });
 
       const response = await fetch(`${API_BASE_URL}/api/locations?${params.toString()}`);
@@ -869,7 +915,7 @@ export default function OutreachMapDashboard() {
         printers={layers.printers ? printers : []}
         highlightedRegions={layers.regions ? highlightedRegions : []}
         recommendedLocationIds={recommendedLocationIds}
-        routeItemDedupeKeys={new Set(routeItems.map((item) => item.dedupeKey))}
+        routeItemDedupeKeys={routeItemDedupeKeys}
         selectedLocation={selectedLocation}
         selectedMeetup={selectedMeetup}
         focusRequest={focusRequest}
