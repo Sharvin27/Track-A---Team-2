@@ -72,7 +72,12 @@ async function signup(req, res) {
        RETURNING id`,
       [username.trim(), email.trim().toLowerCase(), password_hash, fullNameTrimmed]
     );
-    const user = await fetchUserById(result.rows[0].id);
+    const newUserId = result.rows[0].id;
+    await query(
+      `INSERT INTO user_stats (id, flyers, hours, "updatedAt") VALUES ($1, 0, 0, NOW())`,
+      [newUserId]
+    );
+    const user = await fetchUserById(newUserId);
     const token = jwt.sign(
       { userId: user.id, email: user.email },
       JWT_SECRET,
