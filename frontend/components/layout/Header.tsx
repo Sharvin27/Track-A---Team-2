@@ -176,25 +176,30 @@ export default function Header({
           <h1
             style={{
               fontFamily: "'Fraunces', Georgia, serif",
-              fontSize: isMobile ? 17 : 19,
+              fontSize: isMobile ? 16 : 19,
               fontWeight: 600,
               color: "#1a1600",
               lineHeight: 1.2,
               letterSpacing: "-0.4px",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
             }}
           >
             {meta.title}
           </h1>
-          <p
-            style={{
-              fontSize: isMobile ? 11 : 12,
-              color: "#9a8a60",
-              marginTop: 1,
-              whiteSpace: isMobile ? "normal" : "nowrap",
-            }}
-          >
-            {meta.sub}
-          </p>
+          {!isMobile && (
+            <p
+              style={{
+                fontSize: 12,
+                color: "#9a8a60",
+                marginTop: 1,
+                whiteSpace: "nowrap",
+              }}
+            >
+              {meta.sub}
+            </p>
+          )}
         </div>
       </div>
 

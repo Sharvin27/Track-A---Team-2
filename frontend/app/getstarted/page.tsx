@@ -54,13 +54,13 @@ export default function GetStartedPage() {
           position: "relative", borderRadius: 20, overflow: "hidden",
           background: "linear-gradient(130deg, #f5c842 0%, #fbbf24 60%, #f59e0b 100%)",
           boxShadow: "0 8px 32px rgba(245,200,66,0.35)",
-          padding: "48px 56px", textAlign: "center", marginBottom: 28,
+          padding: "clamp(28px, 5vw, 48px) clamp(20px, 5vw, 56px)", textAlign: "center", marginBottom: 28,
         }}
       >
         <div style={{ position: "absolute", top: -40, right: -40, width: 200, height: 200, borderRadius: "50%", background: "rgba(255,255,255,0.12)", pointerEvents: "none" }} />
         <div style={{ position: "absolute", bottom: -50, left: -30, width: 160, height: 160, borderRadius: "50%", background: "rgba(255,255,255,0.08)", pointerEvents: "none" }} />
         <div className="anim-float" style={{ fontSize: 52, marginBottom: 14, lineHeight: 1 }}>🍋</div>
-        <h2 style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 34, fontWeight: 700, color: "#1a1000", letterSpacing: "-0.8px", marginBottom: 10 }}>
+        <h2 style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: "clamp(24px, 5vw, 34px)", fontWeight: 700, color: "#1a1000", letterSpacing: "-0.8px", marginBottom: 10 }}>
           Welcome to the Hub
         </h2>
         <p style={{ fontSize: 14.5, color: "rgba(60,40,0,0.65)", maxWidth: 480, margin: "0 auto" }}>
@@ -72,7 +72,7 @@ export default function GetStartedPage() {
       {/* ── Steps ─────────────────────────────────────────────── */}
       <div
         className="anim-fade-up d2"
-        style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 24 }}
+        style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 16, marginBottom: 24 }}
       >
         {steps.map((s) => (
           <div
@@ -126,7 +126,7 @@ export default function GetStartedPage() {
         subtitle="Everything you need to know before you start"
         style={{ marginBottom: 24 }}
       >
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px 40px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "12px 40px" }}>
           {faqs.map((faq, i) => (
             <div key={faq.q} style={{ padding: "14px 0", borderBottom: i < 4 ? "1px solid rgba(190,155,70,0.12)" : "none" }}>
               <p style={{ fontSize: 13.5, fontWeight: 600, color: "#1a1600", marginBottom: 5 }}>{faq.q}</p>
