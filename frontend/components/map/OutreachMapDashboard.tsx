@@ -1,9 +1,19 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useRouter } from "next/navigation";
-import { useEffect, useEffectEvent, useState } from "react";
+import { useCallback, useEffect, useEffectEvent, useRef, useState } from "react";
+import {
+  fetchPrinters,
+  type Printer,
+} from "@/lib/printers";
+import {
+  addRouteItem,
+  deleteRouteItem,
+  getRouteItems,
+} from "@/lib/route-items";
 import { useAuth } from "@/context/AuthContext";
+import type { SavedRouteItem, SavedRouteItemsResponse } from "@/types/route-items";
+import { useRouter } from "next/navigation";
 import { getMeetups, joinMeetup } from "@/lib/meetup-api";
 import { formatDateTimeRange } from "@/lib/social-format";
 import type { MeetupSummary } from "@/lib/social-types";
@@ -71,6 +81,10 @@ export type MapBounds = {
 export type MapViewportState = {
   zoom: number;
   bounds: MapBounds | null;
+  center: {
+    lat: number;
+    lng: number;
+  } | null;
 };
 
 export type MapFocusRequest = {
@@ -96,6 +110,7 @@ type LayerVisibility = {
   uncovered: boolean;
   covered: boolean;
   regions: boolean;
+  printers: boolean;
   meetups: boolean;
 };
 type PriorityOrigin = {
@@ -103,6 +118,8 @@ type PriorityOrigin = {
   lng: number;
   label: string;
 };
+
+export type MapPrinter = Printer;
 
 type LocationsResponse = {
   success: boolean;
@@ -150,6 +167,10 @@ type NeedRegionImportResponse = {
 const OutreachMapCanvas = dynamic(() => import("./OutreachMapCanvas"), {
   ssr: false,
 });
+const TrackerSessionExperience = dynamic(
+  () => import("@/components/tracker/TrackerSessionExperience"),
+  { ssr: false },
+);
 
 const hubs: MapHub[] = [
   { id: "hub-manhattan", name: "Manhattan Volunteer Base", lat: 40.7831, lng: -73.9712 },
@@ -171,7 +192,9 @@ export default function OutreachMapDashboard() {
   const router = useRouter();
   const { token, isGuest } = useAuth();
   const [locations, setLocations] = useState<MapLocation[]>([]);
+  const [printers, setPrinters] = useState<MapPrinter[]>([]);
   const [needRegions, setNeedRegions] = useState<MapNeedRegion[]>([]);
+  const [routeItems, setRouteItems] = useState<SavedRouteItem[]>([]);
   const [meetups, setMeetups] = useState<MeetupSummary[]>([]);
   const [selectedLocationId, setSelectedLocationId] = useState<string | null>(null);
   const [selectedMeetupId, setSelectedMeetupId] = useState<number | null>(null);
@@ -180,22 +203,47 @@ export default function OutreachMapDashboard() {
     uncovered: true,
     covered: false,
     regions: true,
+    printers: true,
     meetups: true,
   });
-  const [viewport, setViewport] = useState<MapViewportState>({ zoom: 12, bounds: null });
+  const [viewport, setViewport] = useState<MapViewportState>({
+    zoom: 12,
+    bounds: null,
+    center: null,
+  });
   const [isLoading, setIsLoading] = useState(true);
   const [isSearching, setIsSearching] = useState(false);
+  const [isLoadingPrinters, setIsLoadingPrinters] = useState(false);
+  const [isLoadingRouteItems, setIsLoadingRouteItems] = useState(false);
+  const [isTrackerMode, setIsTrackerMode] = useState(false);
   const [showTools, setShowTools] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [printerErrorMessage, setPrinterErrorMessage] = useState<string | null>(null);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [hasAutoSeeded, setHasAutoSeeded] = useState(false);
   const [hasAutoSeededRegions, setHasAutoSeededRegions] = useState(false);
+  const [hasResolvedPrinterLocation, setHasResolvedPrinterLocation] = useState(false);
   const [focusRequest, setFocusRequest] = useState<MapFocusRequest | null>(null);
+  const lastPrinterQueryRef = useRef<{ lat: number; lng: number } | null>(null);
   const [priorityOrigin, setPriorityOrigin] = useState<PriorityOrigin>({
     lat: hubs[0].lat,
     lng: hubs[0].lng,
     label: hubs[0].name,
   });
+
+  const handleViewportChange = useCallback((nextViewport: MapViewportState) => {
+    setViewport((currentViewport) => {
+      if (
+        currentViewport.zoom === nextViewport.zoom &&
+        areBoundsEqual(currentViewport.bounds, nextViewport.bounds) &&
+        areCentersEqual(currentViewport.center, nextViewport.center)
+      ) {
+        return currentViewport;
+      }
+
+      return nextViewport;
+    });
+  }, []);
 
   const locationsWithDistance: DistanceLocation[] = locations.map((location) => ({
     ...location,
@@ -239,6 +287,10 @@ export default function OutreachMapDashboard() {
 
   const selectedLocation =
     rankedLocations.find((location) => location.id === selectedLocationId) || null;
+  const routeItemByDedupeKey = new Map(routeItems.map((item) => [item.dedupeKey, item]));
+  const selectedLocationRouteItem = selectedLocation
+    ? routeItemByDedupeKey.get(getHotspotRouteDedupeKey(selectedLocation))
+    : null;
   const selectedMeetup =
     meetups.find((meetup) => Number(meetup.id) === Number(selectedMeetupId)) || null;
 
@@ -251,9 +303,67 @@ export default function OutreachMapDashboard() {
   const runLocationSearch = useEffectEvent((query: string) => {
     void searchForLocation(query);
   });
+  const runRouteItemsLoad = useEffectEvent(() => {
+    void loadRouteItems();
+  });
 
   useEffect(() => {
     runInitialLoad();
+  }, []);
+
+  useEffect(() => {
+    if (!token || isGuest) {
+      setRouteItems([]);
+      return;
+    }
+
+    runRouteItemsLoad();
+  }, [isGuest, token]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (typeof window === "undefined" || !("geolocation" in navigator)) {
+      setHasResolvedPrinterLocation(true);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        if (cancelled) return;
+
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+
+        setFocusRequest({
+          key: Date.now(),
+          lat,
+          lng,
+          zoom: HOTSPOT_REVEAL_ZOOM,
+        });
+        setPriorityOrigin({
+          lat,
+          lng,
+          label: "Your location",
+        });
+        setHasResolvedPrinterLocation(true);
+      },
+      () => {
+        if (cancelled) return;
+        setHasResolvedPrinterLocation(true);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 300000,
+      },
+    );
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -270,6 +380,31 @@ export default function OutreachMapDashboard() {
       window.removeEventListener("lemontree:map-search", handleSearch as EventListener);
     };
   }, []);
+
+  useEffect(() => {
+    if (!layers.printers || !hasResolvedPrinterLocation || !viewport.center) {
+      return;
+    }
+
+    const nextCenter = viewport.center;
+    const timer = window.setTimeout(() => {
+      const lastQuery = lastPrinterQueryRef.current;
+
+      if (
+        lastQuery &&
+        getDistanceMiles(lastQuery.lat, lastQuery.lng, nextCenter.lat, nextCenter.lng) < 0.15
+      ) {
+        return;
+      }
+
+      lastPrinterQueryRef.current = nextCenter;
+      void loadPrintersForArea(nextCenter.lat, nextCenter.lng);
+    }, 350);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [hasResolvedPrinterLocation, layers.printers, viewport.center]);
 
   async function loadStoredHotspots(autoSeedIfEmpty = false) {
     setIsLoading(true);
@@ -335,6 +470,43 @@ export default function OutreachMapDashboard() {
       setErrorMessage(
         error instanceof Error ? error.message : "Failed to load need regions",
       );
+    }
+  }
+
+  async function loadPrintersForArea(lat: number, lng: number) {
+    setIsLoadingPrinters(true);
+    setPrinterErrorMessage(null);
+
+    try {
+      const nextPrinters = await fetchPrinters(lat, lng);
+      setPrinters(nextPrinters);
+    } catch (error) {
+      setPrinters([]);
+      setPrinterErrorMessage(
+        error instanceof Error ? error.message : "Failed to load nearby printers",
+      );
+    } finally {
+      setIsLoadingPrinters(false);
+    }
+  }
+
+  async function loadRouteItems() {
+    if (!token || isGuest) {
+      setRouteItems([]);
+      return;
+    }
+
+    setIsLoadingRouteItems(true);
+
+    try {
+      const payload = (await getRouteItems(token)) as SavedRouteItemsResponse;
+      setRouteItems(payload.data || []);
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Failed to load saved route items",
+      );
+    } finally {
+      setIsLoadingRouteItems(false);
     }
   }
 
@@ -484,6 +656,101 @@ export default function OutreachMapDashboard() {
     }
   }
 
+  async function handleAddHotspotToRoute(location: RankedLocation) {
+    if (!token || isGuest) {
+      setErrorMessage("Sign in to save route items.");
+      return;
+    }
+
+    try {
+      const savedItem = await addRouteItem(token, {
+        itemType: "hotspot",
+        hotspotId: location.id,
+        sourceId: location.osmId,
+        sourceKey: location.sourceKey,
+        name: location.name,
+        address: location.address,
+        category: location.category,
+        lat: location.lat,
+        lng: location.lng,
+        regionCode: location.regionCode,
+        metadata: {
+          priority: location.derivedPriority,
+          covered: location.covered,
+        },
+      });
+
+      setRouteItems((current) => upsertRouteItemInList(current, savedItem));
+      setSyncMessage(`${location.name} added to route.`);
+      setErrorMessage(null);
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Failed to save route item",
+      );
+    }
+  }
+
+  async function handleTogglePrinterRoute(printer: MapPrinter) {
+    if (!token || isGuest) {
+      setErrorMessage("Sign in to save route items.");
+      return;
+    }
+
+    const existing = routeItemByDedupeKey.get(getPrinterRouteDedupeKey(printer));
+
+    try {
+      if (existing) {
+        await deleteRouteItem(token, existing.id);
+        setRouteItems((current) => current.filter((item) => item.id !== existing.id));
+        setSyncMessage(`${printer.name} removed from route.`);
+        return;
+      }
+
+      const savedItem = await addRouteItem(token, {
+        itemType: "printer",
+        sourceId: printer.id,
+        name: printer.name,
+        address: printer.address,
+        category: "Printer",
+        lat: printer.lat,
+        lng: printer.lng,
+        metadata: {
+          distance: printer.distance,
+          hours: printer.hours,
+          tags: printer.tags,
+          priceLevel: printer.priceLevel ?? null,
+        },
+      });
+
+      setRouteItems((current) => upsertRouteItemInList(current, savedItem));
+      setSyncMessage(`${printer.name} added to route.`);
+      setErrorMessage(null);
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Failed to update route item",
+      );
+    }
+  }
+
+  async function handleRemoveSelectedRouteItem() {
+    if (!token || !selectedLocationRouteItem) {
+      return;
+    }
+
+    try {
+      await deleteRouteItem(token, selectedLocationRouteItem.id);
+      setRouteItems((current) =>
+        current.filter((item) => item.id !== selectedLocationRouteItem.id),
+      );
+      setSyncMessage(`${selectedLocation?.name ?? "Hotspot"} removed from route.`);
+      setErrorMessage(null);
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Failed to remove route item",
+      );
+    }
+  }
+
   async function handleMeetupJoin(meetupId: number) {
     if (!token || isGuest) {
       return;
@@ -513,6 +780,18 @@ export default function OutreachMapDashboard() {
     window.open(`https://www.google.com/maps/search/?${params.toString()}`, "_blank", "noopener,noreferrer");
   }
 
+  if (isTrackerMode) {
+    return (
+      <TrackerSessionExperience
+        token={token}
+        isGuest={isGuest}
+        plannedItems={routeItems}
+        onExit={() => setIsTrackerMode(false)}
+        onPlannedItemsCleared={() => setRouteItems([])}
+      />
+    );
+  }
+
   return (
     <div
       style={{
@@ -526,8 +805,10 @@ export default function OutreachMapDashboard() {
       <OutreachMapCanvas
         locations={visibleLocations}
         meetups={visibleMeetups}
+        printers={layers.printers ? printers : []}
         highlightedRegions={layers.regions ? highlightedRegions : []}
         recommendedLocationIds={recommendedLocationIds}
+        routeItemDedupeKeys={new Set(routeItems.map((item) => item.dedupeKey))}
         selectedLocation={selectedLocation}
         selectedMeetup={selectedMeetup}
         focusRequest={focusRequest}
@@ -539,11 +820,12 @@ export default function OutreachMapDashboard() {
           setSelectedMeetupId(meetupId);
           setSelectedLocationId(null);
         }}
+        onTogglePrinterRoute={handleTogglePrinterRoute}
         onMapClick={() => {
           setSelectedLocationId(null);
           setSelectedMeetupId(null);
         }}
-        onViewportChange={setViewport}
+        onViewportChange={handleViewportChange}
       />
 
       <div
@@ -590,6 +872,7 @@ export default function OutreachMapDashboard() {
                   ["recommended", "Recommended"],
                   ["uncovered", "Uncovered"],
                   ["covered", "Covered"],
+                  ["printers", "Printers"],
                   ["regions", "High-need regions"],
                   ["meetups", "Meetups"],
                 ].map(([key, label]) => {
@@ -621,7 +904,7 @@ export default function OutreachMapDashboard() {
                 })}
               </div>
               <p style={{ fontSize: 11.5, color: "#8a7a50", marginTop: 6 }}>
-                Default view shows recommended, uncovered, and high-need regions first.
+                Default view shows recommended hotspots, uncovered spots, printers, and high-need regions first.
               </p>
             </div>
 
@@ -663,7 +946,15 @@ export default function OutreachMapDashboard() {
           {
             key: "legend",
             content: (
-              <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 12,
+                  flexWrap: "nowrap",
+                  whiteSpace: "nowrap",
+                }}
+              >
                 <LegendItem
                   label="Recommended spot"
                   icon={
@@ -713,6 +1004,40 @@ export default function OutreachMapDashboard() {
                   }
                 />
                 <LegendItem
+                  label="Printer"
+                  icon={
+                    <span
+                      style={{
+                        width: 18,
+                        height: 18,
+                        borderRadius: 999,
+                        background: "#f8fafc",
+                        border: "2px solid #475569",
+                        color: "#334155",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <svg
+                        width="10"
+                        height="10"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="#334155"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
+                      >
+                        <polyline points="6 9 6 2 18 2 18 9" />
+                        <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+                        <rect x="6" y="14" width="12" height="8" />
+                      </svg>
+                    </span>
+                  }
+                />
+                <LegendItem
                   label="Higher-need region"
                   icon={
                     <span
@@ -752,6 +1077,8 @@ export default function OutreachMapDashboard() {
                 ? "Zoom in or search to reveal individual hotspots"
                 : layeredLocations.length > visibleLocations.length
                 ? "Zoom in to reveal more places"
+                : layers.printers
+                ? "Map shows current hotspots and nearby printers"
                 : "Map shows current hotspot set",
           },
         ].map((item) => (
@@ -766,6 +1093,7 @@ export default function OutreachMapDashboard() {
               color: "#6f5e37",
               fontSize: 11.5,
               fontWeight: 700,
+              overflowX: item.key === "legend" ? "auto" : "visible",
             }}
           >
             {item.content}
@@ -972,9 +1300,32 @@ export default function OutreachMapDashboard() {
                   fontWeight: 800,
                   boxShadow: "0 10px 22px rgba(15,23,42,0.18)",
                 }}
+                >
+                  Get directions
+                </button>
+              <button
+                onClick={() =>
+                  selectedLocationRouteItem
+                    ? void handleRemoveSelectedRouteItem()
+                    : void handleAddHotspotToRoute(selectedLocation)
+                }
+                style={{
+                  width: "100%",
+                  borderRadius: 15,
+                  padding: "12px 14px",
+                  background: "rgba(255,255,255,0.08)",
+                  border: "1px solid rgba(255,255,255,0.10)",
+                  color: "#fff7de",
+                  fontSize: 12.5,
+                  fontWeight: 800,
+                  boxShadow: "0 10px 22px rgba(15,23,42,0.18)",
+                }}
               >
-                Get directions
+                {selectedLocationRouteItem ? "Remove from route" : "Add to route"}
               </button>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 10, marginTop: 10 }}>
               <button
                 onClick={() => void toggleCovered(selectedLocation.id, selectedLocation.covered)}
                 style={{
@@ -1000,7 +1351,36 @@ export default function OutreachMapDashboard() {
         </div>
       ) : null}
 
-      {(isLoading || errorMessage) && (
+      <div
+        style={{
+          position: "absolute",
+          left: "50%",
+          bottom: 18,
+          transform: "translateX(-50%)",
+          zIndex: 500,
+        }}
+      >
+        <button
+          type="button"
+          onClick={() => setIsTrackerMode(true)}
+          disabled={isLoadingRouteItems}
+          style={{
+            borderRadius: 999,
+            padding: "13px 18px",
+            background: "linear-gradient(135deg, #1a1000 0%, #3a2700 100%)",
+            border: "1px solid rgba(245,200,66,0.24)",
+            color: "#fff7de",
+            boxShadow: "0 16px 34px rgba(26,16,0,0.28)",
+            fontSize: 12.5,
+            fontWeight: 800,
+            opacity: isLoadingRouteItems ? 0.7 : 1,
+          }}
+        >
+          {isLoadingRouteItems ? "Loading route..." : "Route Tracker"}
+        </button>
+      </div>
+
+      {(isLoading || errorMessage || isLoadingPrinters || printerErrorMessage || isLoadingRouteItems) && (
         <div
           style={{
             position: "absolute",
@@ -1013,13 +1393,32 @@ export default function OutreachMapDashboard() {
           {isLoading && (
             <div style={statusChipStyle}>Loading stored hotspots...</div>
           )}
+          {!isLoading && isLoadingRouteItems && (
+            <div style={{ ...statusChipStyle, marginTop: 8 }}>Loading saved route...</div>
+          )}
+          {!isLoading && isLoadingPrinters && (
+            <div style={{ ...statusChipStyle, marginTop: 8 }}>Loading nearby printers...</div>
+          )}
           {!isLoading && errorMessage && (
             <div style={{ ...statusChipStyle, color: "#b91c1c", background: "rgba(255,245,245,0.94)" }}>
               {errorMessage}
             </div>
           )}
+          {!isLoading && printerErrorMessage && (
+            <div
+              style={{
+                ...statusChipStyle,
+                marginTop: 8,
+                color: "#b91c1c",
+                background: "rgba(255,245,245,0.94)",
+              }}
+            >
+              {printerErrorMessage}
+            </div>
+          )}
         </div>
       )}
+
     </div>
   );
 }
@@ -1045,6 +1444,24 @@ const statusChipStyle: React.CSSProperties = {
   fontSize: 11.5,
   fontWeight: 700,
 };
+
+function getHotspotRouteDedupeKey(location: Pick<MapLocation, "id">) {
+  return `hotspot:${location.id}`;
+}
+
+function getPrinterRouteDedupeKey(printer: Pick<MapPrinter, "id">) {
+  return `printer:${printer.id}`;
+}
+
+function upsertRouteItemInList(current: SavedRouteItem[], next: SavedRouteItem) {
+  const existingIndex = current.findIndex((item) => item.id === next.id);
+
+  if (existingIndex === -1) {
+    return [...current, next];
+  }
+
+  return current.map((item) => (item.id === next.id ? next : item));
+}
 
 function getVisibleLocations(
   locations: RankedLocation[],
@@ -1081,6 +1498,28 @@ function getVisibleLocations(
   }
 
   return sorted;
+}
+
+function areBoundsEqual(current: MapBounds | null, next: MapBounds | null) {
+  if (current === next) return true;
+  if (!current || !next) return current === next;
+
+  return (
+    current.north === next.north &&
+    current.south === next.south &&
+    current.east === next.east &&
+    current.west === next.west
+  );
+}
+
+function areCentersEqual(
+  current: MapViewportState["center"],
+  next: MapViewportState["center"],
+) {
+  if (current === next) return true;
+  if (!current || !next) return current === next;
+
+  return current.lat === next.lat && current.lng === next.lng;
 }
 
 function getVisibleMeetups(meetups: MeetupSummary[], viewport: MapViewportState) {

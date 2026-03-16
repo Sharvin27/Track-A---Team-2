@@ -443,6 +443,8 @@ export default function TrackerPage() {
           session={lastCompletedSession}
           onClose={() => setIsShareOpen(false)}
           isGuest={isGuest}
+          saveState={saveState}
+          saveError={saveError}
         />
 
         <SectionCard title="Tracking Notes" subtitle="MVP guardrails and behavior">

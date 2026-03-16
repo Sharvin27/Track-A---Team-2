@@ -4,11 +4,15 @@ import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import mapboxgl, { GeoJSONSource } from "mapbox-gl";
 import type { RoutePoint, SessionStop } from "@/types/tracker";
+import type { SavedRouteItem } from "@/types/route-items";
 
 interface TrackerMapProps {
   routePoints: RoutePoint[];
   currentPoint: RoutePoint | null;
   stops: SessionStop[];
+  plannedItems?: SavedRouteItem[];
+  onSelectPlannedItem?: (item: SavedRouteItem) => void;
+  onMapClick?: () => void;
   height?: number | string;
   overlay?: ReactNode;
   onSnapshotReady?: (capture: (() => Promise<string | null>) | null) => void;
@@ -20,6 +24,9 @@ export default function TrackerMap({
   routePoints,
   currentPoint,
   stops,
+  plannedItems = [],
+  onSelectPlannedItem,
+  onMapClick,
   height = 520,
   overlay = null,
   onSnapshotReady,
@@ -29,6 +36,7 @@ export default function TrackerMap({
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const currentMarkerRef = useRef<mapboxgl.Marker | null>(null);
   const stopMarkersRef = useRef<mapboxgl.Marker[]>([]);
+  const plannedMarkersRef = useRef<mapboxgl.Marker[]>([]);
   const latestRoutePointsRef = useRef<RoutePoint[]>(routePoints);
   const latestStopsRef = useRef<SessionStop[]>(stops);
   const latestCurrentPointRef = useRef<RoutePoint | null>(currentPoint);
@@ -107,15 +115,33 @@ export default function TrackerMap({
       setMapError("The map failed to load. Check your Mapbox token and network access.");
     });
 
+    const handleBackgroundClick = (event: mapboxgl.MapMouseEvent) => {
+      const target = event.originalEvent.target as HTMLElement | null;
+      if (target?.closest(".lemontree-planned-marker")) {
+        return;
+      }
+
+      onMapClick?.();
+    };
+
+    if (onMapClick) {
+      map.on("click", handleBackgroundClick);
+    }
+
     return () => {
       onSnapshotReady?.(null);
+      if (onMapClick) {
+        map.off("click", handleBackgroundClick);
+      }
       stopMarkersRef.current.forEach((marker) => marker.remove());
       stopMarkersRef.current = [];
+      plannedMarkersRef.current.forEach((marker) => marker.remove());
+      plannedMarkersRef.current = [];
       currentMarkerRef.current?.remove();
       map.remove();
       mapRef.current = null;
     };
-  }, [onSnapshotReady, tokenMissing]);
+  }, [onMapClick, onSnapshotReady, tokenMissing]);
 
   useEffect(() => {
     if (!mapRef.current) {
@@ -220,6 +246,61 @@ export default function TrackerMap({
     });
   }, [stops]);
 
+  useEffect(() => {
+    const map = mapRef.current;
+
+    if (!map) {
+      return;
+    }
+
+    plannedMarkersRef.current.forEach((marker) => marker.remove());
+    plannedMarkersRef.current = plannedItems.map((item) => {
+      const element = document.createElement("div");
+      element.className = "lemontree-planned-marker";
+      element.style.width = "36px";
+      element.style.height = "50px";
+      element.style.backgroundRepeat = "no-repeat";
+      element.style.backgroundSize = "contain";
+      element.style.backgroundPosition = "center bottom";
+      element.style.filter =
+        item.itemType === "printer"
+          ? "drop-shadow(0 14px 22px rgba(51,65,85,0.22))"
+          : "drop-shadow(0 14px 22px rgba(37,99,235,0.24))";
+      element.style.backgroundImage = `url("data:image/svg+xml;utf8,${encodeURIComponent(
+        getPlannedPinSvg(item.itemType),
+      )}")`;
+
+      element.style.cursor = "pointer";
+      const handleSelect = (event: MouseEvent | TouchEvent) => {
+        event.preventDefault();
+        event.stopPropagation();
+        onSelectPlannedItem?.(item);
+      };
+
+      element.addEventListener("mousedown", handleSelect);
+      element.addEventListener("touchstart", handleSelect);
+      element.addEventListener("click", handleSelect);
+
+      return new mapboxgl.Marker({
+        element,
+        anchor: "bottom",
+        offset: [0, -2],
+      })
+        .setLngLat([item.lng, item.lat])
+        .addTo(map);
+    });
+
+    if (!currentPoint && plannedItems.length > 0) {
+      const bounds = new mapboxgl.LngLatBounds();
+      plannedItems.forEach((item) => bounds.extend([item.lng, item.lat]));
+      map.fitBounds(bounds, {
+        padding: 80,
+        maxZoom: 15,
+        duration: 800,
+      });
+    }
+  }, [currentPoint, onSelectPlannedItem, plannedItems]);
+
   return (
     <div
       style={{
@@ -285,6 +366,28 @@ export default function TrackerMap({
       ) : null}
     </div>
   );
+}
+
+function getPlannedPinSvg(itemType: SavedRouteItem["itemType"]) {
+  if (itemType === "printer") {
+    return `
+      <svg xmlns="http://www.w3.org/2000/svg" width="36" height="50" viewBox="0 0 36 50" fill="none">
+        <path d="M18 48C18 48 31 31.7 31 19C31 10.7 25.3 4 18 4C10.7 4 5 10.7 5 19C5 31.7 18 48 18 48Z" fill="#F8FAFC" stroke="#475569" stroke-width="3"/>
+        <circle cx="18" cy="19" r="8.5" fill="#F8FAFC" stroke="#475569" stroke-width="2"/>
+        <path d="M14 17V13.5H22V17" stroke="#334155" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M14 22H12.8C11.8 22 11 21.2 11 20.2V17.8C11 16.8 11.8 16 12.8 16H23.2C24.2 16 25 16.8 25 17.8V20.2C25 21.2 24.2 22 23.2 22H22" stroke="#334155" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        <rect x="14" y="20.5" width="8" height="5.5" rx="0.8" stroke="#334155" stroke-width="1.8"/>
+      </svg>
+    `;
+  }
+
+  return `
+    <svg xmlns="http://www.w3.org/2000/svg" width="36" height="50" viewBox="0 0 36 50" fill="none">
+      <path d="M18 48C18 48 31 31.7 31 19C31 10.7 25.3 4 18 4C10.7 4 5 10.7 5 19C5 31.7 18 48 18 48Z" fill="#FFFFFF" stroke="#2563EB" stroke-width="3"/>
+      <circle cx="18" cy="19" r="9" fill="#DBEAFE" stroke="#60A5FA" stroke-width="2"/>
+      <circle cx="18" cy="19" r="5.5" fill="#60A5FA"/>
+    </svg>
+  `;
 }
 
 async function captureRouteSnapshot({

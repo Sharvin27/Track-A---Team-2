@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { CHAIN_PRICES, PRICE_LEVEL_LABEL } from "@/lib/printers";
 import {
   GeoJSON,
   MapContainer,
@@ -17,6 +18,7 @@ import type {
   MapFocusRequest,
   MapLocation,
   MapNeedRegion,
+  MapPrinter,
   MapViewportState,
 } from "./OutreachMapDashboard";
 import { latLngBounds } from "leaflet";
@@ -24,6 +26,8 @@ import type { MeetupSummary } from "@/lib/social-types";
 
 const mapCenter: LatLngExpression = [40.7395, -73.9363];
 const INDIVIDUAL_MARKER_ZOOM = 15;
+const popupPaddingTopLeft: [number, number] = [24, 96];
+const popupPaddingBottomRight: [number, number] = [340, 32];
 const nycBounds = latLngBounds(
   [40.4774, -74.2591],
   [40.9176, -73.7004],
@@ -90,6 +94,35 @@ function createClusterIcon(count: number, kind: "recommended" | "uncovered") {
   });
 }
 
+function createPrinterIcon() {
+  const size = 24;
+
+  return divIcon({
+    className: "",
+    html: `
+      <div style="
+        width: ${size}px;
+        height: ${size}px;
+        border-radius: 999px;
+        background: #f8fafc;
+        border: 2px solid #475569;
+        box-shadow: 0 10px 20px rgba(51,65,85,0.18);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      ">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#334155" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <polyline points="6 9 6 2 18 2 18 9"></polyline>
+          <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+          <rect x="6" y="14" width="12" height="8"></rect>
+        </svg>
+      </div>
+    `,
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
+  });
+}
+
 function createMeetupMarkerIcon(selected: boolean) {
   return divIcon({
     className: "",
@@ -120,6 +153,10 @@ function ViewportReporter({
         south: bounds.getSouth(),
         east: bounds.getEast(),
         west: bounds.getWest(),
+      },
+      center: {
+        lat: map.getCenter().lat,
+        lng: map.getCenter().lng,
       },
     });
   }, [map, onViewportChange]);
@@ -193,25 +230,31 @@ function ApplyFocusRequest({
 
 export default function OutreachMapCanvas({
   locations,
+  printers,
   meetups,
   highlightedRegions,
   recommendedLocationIds,
+  routeItemDedupeKeys,
   selectedLocation,
   selectedMeetup,
   focusRequest,
   onSelect,
+  onTogglePrinterRoute,
   onSelectMeetup,
   onMapClick,
   onViewportChange,
 }: {
   locations: MapLocation[];
+  printers: MapPrinter[];
   meetups: MeetupSummary[];
   highlightedRegions: MapNeedRegion[];
   recommendedLocationIds: string[];
+  routeItemDedupeKeys: Set<string>;
   selectedLocation: MapLocation | null;
   selectedMeetup: MeetupSummary | null;
   focusRequest: MapFocusRequest | null;
   onSelect: (id: string) => void;
+  onTogglePrinterRoute: (printer: MapPrinter) => void;
   onSelectMeetup: (id: number) => void;
   onMapClick: () => void;
   onViewportChange: (viewport: MapViewportState) => void;
@@ -259,6 +302,11 @@ export default function OutreachMapCanvas({
         selectedLocation={selectedLocation}
         recommendedLocationIds={recommendedLocationIds}
         onSelect={onSelect}
+      />
+      <PrinterMarkers
+        printers={printers}
+        routeItemDedupeKeys={routeItemDedupeKeys}
+        onTogglePrinterRoute={onTogglePrinterRoute}
       />
       <MeetupMarkers
         meetups={meetups}
@@ -327,7 +375,10 @@ function LocationMarkers({
                     click: () => onSelect(location.id),
                   }}
                 >
-                  <Popup>
+                  <Popup
+                    autoPanPaddingTopLeft={popupPaddingTopLeft}
+                    autoPanPaddingBottomRight={popupPaddingBottomRight}
+                  >
                     <div style={{ minWidth: 190 }}>
                       <strong>{location.name}</strong>
                       <div style={{ marginTop: 4 }}>{location.address}</div>
@@ -356,7 +407,10 @@ function LocationMarkers({
                 },
               }}
             >
-              <Popup>
+              <Popup
+                autoPanPaddingTopLeft={popupPaddingTopLeft}
+                autoPanPaddingBottomRight={popupPaddingBottomRight}
+              >
                 <div style={{ minWidth: 170 }}>
                   <strong>{cluster.locations.length} spots here</strong>
                   <div style={{ marginTop: 6 }}>
@@ -386,7 +440,10 @@ function LocationMarkers({
                 click: () => onSelect(location.id),
               }}
             >
-              <Popup>
+              <Popup
+                autoPanPaddingTopLeft={popupPaddingTopLeft}
+                autoPanPaddingBottomRight={popupPaddingBottomRight}
+              >
                 <div style={{ minWidth: 190 }}>
                   <strong>{location.name}</strong>
                   <div style={{ marginTop: 4 }}>{location.address}</div>
@@ -397,6 +454,131 @@ function LocationMarkers({
               </Popup>
             </Marker>
           </Fragment>
+        );
+      })}
+    </>
+  );
+}
+
+function PrinterMarkers({
+  printers,
+  routeItemDedupeKeys,
+  onTogglePrinterRoute,
+}: {
+  printers: MapPrinter[];
+  routeItemDedupeKeys: Set<string>;
+  onTogglePrinterRoute: (printer: MapPrinter) => void;
+}) {
+  if (printers.length === 0) {
+    return null;
+  }
+
+  return (
+    <>
+      {printers.map((printer) => {
+        const chain = CHAIN_PRICES.find((candidate) => candidate.match.test(printer.name));
+        const level = printer.priceLevel ? PRICE_LEVEL_LABEL[printer.priceLevel] : null;
+        const inRoute = routeItemDedupeKeys.has(`printer:${printer.id}`);
+
+        return (
+          <Marker
+            key={printer.id}
+            position={[printer.lat, printer.lng]}
+            icon={createPrinterIcon()}
+            zIndexOffset={500}
+          >
+            <Popup
+              autoPanPaddingTopLeft={popupPaddingTopLeft}
+              autoPanPaddingBottomRight={popupPaddingBottomRight}
+            >
+              <div style={{ minWidth: 210 }}>
+                <strong>{printer.name}</strong>
+                <div style={{ marginTop: 4 }}>{printer.address}</div>
+                <div style={{ marginTop: 6, color: "#475569", fontSize: 12 }}>
+                  {printer.hours} · {printer.distance.toFixed(1)} mi
+                </div>
+                {chain ? (
+                  <div style={{ marginTop: 8, fontSize: 12 }}>
+                    {chain.bw} · {chain.color}
+                  </div>
+                ) : level ? (
+                  <div style={{ marginTop: 8 }}>
+                    <span
+                      style={{
+                        fontSize: 11.5,
+                        fontWeight: 700,
+                        padding: "2px 8px",
+                        borderRadius: 999,
+                        background: level.bg,
+                        color: level.color,
+                        display: "inline-block",
+                      }}
+                    >
+                      {level.label}
+                    </span>
+                  </div>
+                ) : null}
+                {printer.tags.length > 0 ? (
+                  <div
+                    style={{
+                      display: "flex",
+                      flexWrap: "wrap",
+                      gap: 6,
+                      marginTop: 8,
+                    }}
+                  >
+                    {printer.tags.map((tag) => (
+                      <span
+                        key={tag}
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 600,
+                          padding: "2px 8px",
+                          borderRadius: 999,
+                          background: "#f8fafc",
+                          border: "1px solid rgba(148,163,184,0.35)",
+                          color: "#475569",
+                        }}
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+                <div style={{ marginTop: 10 }}>
+                  <button
+                    type="button"
+                    onClick={() => onTogglePrinterRoute(printer)}
+                    style={{
+                      marginRight: 10,
+                      border: "none",
+                      background: "transparent",
+                      color: "#0f172a",
+                      fontSize: 12.5,
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      padding: 0,
+                    }}
+                  >
+                    {inRoute ? "Remove from route" : "Add to route"}
+                  </button>
+                  <a
+                    href={`https://www.google.com/maps/place/?q=place_id:${printer.id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      color: "#1d4ed8",
+                      fontSize: 12.5,
+                      fontWeight: 700,
+                      textDecoration: "none",
+                    }}
+                  >
+                    View on Maps
+                  </a>
+                </div>
+              </div>
+            </Popup>
+          </Marker>
         );
       })}
     </>

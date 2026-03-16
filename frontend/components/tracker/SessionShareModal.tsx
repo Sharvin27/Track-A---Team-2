@@ -1,9 +1,10 @@
 "use client";
 
+import Image from "next/image";
 import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
 import { formatDistance } from "@/lib/distance";
-import { formatDuration } from "@/lib/session";
+import { formatDuration, formatStopType } from "@/lib/session";
 import type { VolunteerSession } from "@/types/tracker";
 
 interface SessionShareModalProps {
@@ -11,6 +12,9 @@ interface SessionShareModalProps {
   session: VolunteerSession | null;
   onClose: () => void;
   isGuest?: boolean;
+  contained?: boolean;
+  saveState?: "idle" | "saving" | "saved" | "error";
+  saveError?: string | null;
 }
 
 type ShareState = "idle" | "sharing" | "shared" | "copied" | "downloaded" | "error";
@@ -20,6 +24,9 @@ export default function SessionShareModal({
   session,
   onClose,
   isGuest = false,
+  contained = false,
+  saveState = "idle",
+  saveError = null,
 }: SessionShareModalProps) {
   const [shareState, setShareState] = useState<ShareState>("idle");
   const [shareError, setShareError] = useState<string | null>(null);
@@ -121,12 +128,12 @@ export default function SessionShareModal({
       aria-modal="true"
       aria-label="Share route summary"
       style={{
-        position: "fixed",
+        position: contained ? "absolute" : "fixed",
         inset: 0,
-        zIndex: 120,
+        zIndex: contained ? 1200 : 120,
         background: "rgba(17, 12, 0, 0.52)",
         display: "flex",
-        alignItems: "flex-end",
+        alignItems: contained ? "center" : "flex-end",
         justifyContent: "center",
         padding: 14,
       }}
@@ -134,11 +141,12 @@ export default function SessionShareModal({
       <div
         style={{
           width: "100%",
-          maxWidth: 360,
+          maxWidth: 624,
+          maxHeight: contained ? "min(70vh, 736px)" : "min(72vh, 752px)",
           display: "flex",
           flexDirection: "column",
           gap: 0,
-          borderRadius: 24,
+          borderRadius: 20,
           overflow: "hidden",
           background: "linear-gradient(180deg, #fffef9 0%, #fff8e8 100%)",
           border: "1px solid rgba(190,155,70,0.16)",
@@ -147,7 +155,7 @@ export default function SessionShareModal({
       >
         <div
           style={{
-            padding: "14px 14px 10px",
+            padding: "12px 12px 8px",
             background: "linear-gradient(180deg, #201300 0%, #2b1800 100%)",
             color: "#fff8e8",
           }}
@@ -177,13 +185,13 @@ export default function SessionShareModal({
                 style={{
                   margin: "4px 0 0",
                   fontFamily: "'Fraunces', Georgia, serif",
-                  fontSize: 22,
+                fontSize: 19,
                   lineHeight: 1.05,
                   letterSpacing: "-0.04em",
                   color: "#f7e3ad",
                 }}
               >
-                Share your route
+                Session summary and sharing
               </h3>
             </div>
             <button
@@ -192,7 +200,7 @@ export default function SessionShareModal({
               style={{
                 width: 34,
                 height: 34,
-                borderRadius: 10,
+                borderRadius: 9,
                 border: "1px solid rgba(245,200,66,0.16)",
                 background: "rgba(255,255,255,0.06)",
                 color: "#fff8e8",
@@ -206,22 +214,22 @@ export default function SessionShareModal({
           <p
             style={{
               margin: "8px 0 0",
-              fontSize: 11.5,
+              fontSize: 10.5,
               lineHeight: 1.45,
               color: "rgba(255,241,199,0.76)",
             }}
           >
-            Quick actions for the share sheet, copy, and save.
+            Review the finished route, then share or save it from one place.
           </p>
         </div>
 
         {isGuest ? (
           <div
             style={{
-              padding: "10px 14px",
+              padding: "8px 12px",
               background: "rgba(245,200,66,0.2)",
               borderBottom: "1px solid rgba(190,155,70,0.2)",
-              fontSize: 12,
+              fontSize: 11,
               color: "#5a4a20",
               textAlign: "center",
             }}
@@ -230,27 +238,126 @@ export default function SessionShareModal({
           </div>
         ) : null}
 
-        <div style={{ padding: 14, display: "grid", gap: 12 }}>
+        <div
+          style={{
+            padding: 10,
+            display: "grid",
+            gap: 7,
+            overflowY: "auto",
+          }}
+        >
+          {session.routeImageUrl ? (
+            <div
+              style={{
+                position: "relative",
+                borderRadius: 15,
+                overflow: "hidden",
+                border: "1px solid rgba(190,155,70,0.16)",
+                background: "#f7f3df",
+                minHeight: 256,
+                height: "34vh",
+                maxHeight: 304,
+              }}
+            >
+              <Image
+                src={session.routeImageUrl}
+                alt="Saved route snapshot"
+                fill
+                sizes="(max-width: 900px) 100vw, 780px"
+                unoptimized
+                style={{
+                  objectFit: "cover",
+                }}
+              />
+            </div>
+          ) : null}
+
           <div
             style={{
-              padding: "12px 14px",
-              borderRadius: 18,
-              background: "#fffdf5",
-              border: "1px solid rgba(190,155,70,0.14)",
+              display: "grid",
+              gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+              gap: 5,
             }}
           >
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <StatPill label={formatDistance(session.totalDistanceMeters)} />
-              <StatPill label={formatDuration(session.durationSeconds)} />
-              <StatPill label={`${session.stops.length} stops`} />
-            </div>
+            <SummaryCard label="Start time" value={new Date(session.startTime).toLocaleString()} />
+            <SummaryCard
+              label="End time"
+              value={session.endTime ? new Date(session.endTime).toLocaleString() : "In progress"}
+            />
+            <SummaryCard label="Duration" value={formatDuration(session.durationSeconds)} />
+            <SummaryCard label="Distance" value={formatDistance(session.totalDistanceMeters)} />
+            <SummaryCard label="Route points" value={session.routePoints.length.toString()} />
+            <SummaryCard label="Stops" value={session.stops.length.toString()} />
+          </div>
+
+          <div
+            style={{
+              padding: "8px 10px",
+              borderRadius: 14,
+              background: "#fffdf5",
+              border: "1px solid rgba(190,155,70,0.14)",
+              display: "grid",
+              gap: 5,
+            }}
+          >
+            <p
+              style={{
+                margin: 0,
+                fontSize: 12,
+                fontWeight: 700,
+                letterSpacing: "0.08em",
+                textTransform: "uppercase",
+                color: "#7a5a10",
+              }}
+            >
+              Stops made
+            </p>
+            {session.stops.length === 0 ? (
+              <p style={{ margin: 0, fontSize: 13, color: "#8a7a50", lineHeight: 1.5 }}>
+                No stops were recorded for this session.
+              </p>
+            ) : (
+              <div style={{ display: "grid", gap: 8, maxHeight: 180, overflowY: "auto", paddingRight: 4 }}>
+                {session.stops.map((stop) => (
+                  <div
+                    key={stop.id}
+                    style={{
+                      padding: "7px 9px",
+                      borderRadius: 10,
+                      background: "#fffaf0",
+                      border: "1px solid rgba(190,155,70,0.14)",
+                    }}
+                  >
+                    <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "#1a1600" }}>
+                      {[formatStopType(stop.type), stop.label].filter(Boolean).join(" | ")}
+                    </p>
+                    <p style={{ margin: "3px 0 0", fontSize: 12, color: "#8a7a50" }}>
+                      {`${new Date(stop.timestamp).toLocaleTimeString()} | ${stop.lat.toFixed(5)}, ${stop.lng.toFixed(5)}`}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div
+            style={{
+              fontSize: 12.5,
+              color: saveState === "error" ? "#b91c1c" : "#8a7a50",
+              minHeight: 18,
+            }}
+          >
+            {saveState === "saving" && "Saving session to backend..."}
+            {saveState === "saved" && "Session saved to backend."}
+            {saveState === "error" && (saveError ?? "Saving failed.")}
+            {saveState === "idle" && !saveError && !isGuest ? "Session completed locally." : null}
           </div>
 
           <div
             style={{
               display: "grid",
               gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
-              gap: 10,
+              gap: 6,
             }}
           >
             <IconAction label="Share" icon={<ShareGlyph />} onClick={handleNativeShare} />
@@ -269,8 +376,8 @@ export default function SessionShareModal({
               alignItems: "center",
               justifyContent: "space-between",
               width: "100%",
-              padding: "12px 14px",
-              borderRadius: 16,
+              padding: "9px 11px",
+              borderRadius: 12,
               cursor: "pointer",
               border: "1px solid rgba(245,200,66,0.34)",
               background: "linear-gradient(135deg, #f5c842 0%, #f0b21f 100%)",
@@ -305,8 +412,8 @@ export default function SessionShareModal({
               alignItems: "center",
               justifyContent: "space-between",
               width: "100%",
-              padding: "11px 14px",
-              borderRadius: 16,
+              padding: "8px 11px",
+              borderRadius: 12,
               cursor: !session.routeImageUrl ? "not-allowed" : "pointer",
               border: "1px solid rgba(190,155,70,0.16)",
               background: !session.routeImageUrl ? "rgba(245,239,219,0.7)" : "#fffdf5",
@@ -340,7 +447,7 @@ export default function SessionShareModal({
             {shareState === "downloaded" && "Route image download started."}
             {shareState === "error" && (shareError ?? "Sharing failed.")}
             {(shareState === "idle" || shareState === "sharing") && !shareError
-              ? "Small mobile share popup with quick actions."
+              ? "Use the actions above to share the summary or save the route image."
               : null}
           </div>
         </div>
@@ -349,21 +456,31 @@ export default function SessionShareModal({
   );
 }
 
-function StatPill({ label }: { label: string }) {
+function SummaryCard({ label, value }: { label: string; value: string }) {
   return (
-    <span
+    <div
       style={{
-        padding: "7px 10px",
-        borderRadius: 999,
-        background: "#fff7dc",
-        border: "1px solid rgba(245,200,66,0.18)",
-        fontSize: 11.5,
-        fontWeight: 700,
-        color: "#6b4f0a",
+        padding: "10px 12px",
+        borderRadius: 12,
+        background: "#fffdf5",
+        border: "1px solid rgba(190,155,70,0.14)",
       }}
     >
-      {label}
-    </span>
+      <p
+        style={{
+          margin: 0,
+          fontSize: 10.5,
+          color: "#9a8a60",
+          textTransform: "uppercase",
+          letterSpacing: "0.08em",
+        }}
+      >
+        {label}
+      </p>
+      <p style={{ margin: "4px 0 0", fontSize: 13, fontWeight: 600, color: "#1a1600", lineHeight: 1.3 }}>
+        {value}
+      </p>
+    </div>
   );
 }
 
@@ -386,8 +503,8 @@ function IconAction({
         display: "grid",
         placeItems: "center",
         gap: 6,
-        padding: "12px 8px 10px",
-        borderRadius: 18,
+        padding: "8px 6px 8px",
+        borderRadius: 14,
         border: "1px solid rgba(190,155,70,0.16)",
         background: "#fffdf5",
         color: "#1a1600",
@@ -396,9 +513,9 @@ function IconAction({
     >
       <span
         style={{
-          width: 44,
-          height: 44,
-          borderRadius: 14,
+          width: 34,
+          height: 34,
+          borderRadius: 12,
           display: "grid",
           placeItems: "center",
           background: "linear-gradient(135deg, #fff5cf 0%, #fffdf5 100%)",
@@ -407,7 +524,7 @@ function IconAction({
       >
         {icon}
       </span>
-      <span style={{ fontSize: 11.5, fontWeight: 700 }}>{label}</span>
+      <span style={{ fontSize: 10.5, fontWeight: 700 }}>{label}</span>
     </button>
   );
 }
