@@ -6,10 +6,53 @@ function getDateFilter(period) {
   return null;
 }
 
+function isEnabled(value, fallback = true) {
+  if (value === undefined) return fallback;
+  return value === "true" || value === "1";
+}
+
+function getEnabledMetrics(query) {
+  const enabled = {
+    flyers: isEnabled(query.includeFlyers, true),
+    scans: isEnabled(query.includeScans, true),
+    hours: isEnabled(query.includeHours, true),
+  };
+
+  if (!enabled.flyers && !enabled.scans && !enabled.hours) {
+    return { flyers: true, scans: true, hours: true };
+  }
+
+  return enabled;
+}
+
+function getOrderClause(enabledMetrics) {
+  const clauses = [];
+
+  if (enabledMetrics.flyers) clauses.push("flyers DESC");
+  if (enabledMetrics.scans) clauses.push("scans DESC");
+  if (enabledMetrics.hours) clauses.push("hours DESC");
+
+  clauses.push("username ASC");
+  return clauses.join(", ");
+}
+
+function getActivityWhereClause(enabledMetrics) {
+  const clauses = [];
+
+  if (enabledMetrics.flyers) clauses.push("flyers > 0");
+  if (enabledMetrics.scans) clauses.push("scans > 0");
+  if (enabledMetrics.hours) clauses.push("hours > 0");
+
+  return clauses.length ? clauses.join(" OR ") : "TRUE";
+}
+
 async function getLeaderboard(req, res) {
   try {
     const period = req.query.period || "all";
     const dateFilter = getDateFilter(period);
+    const enabledMetrics = getEnabledMetrics(req.query);
+    const orderClause = getOrderClause(enabledMetrics);
+    const activityWhereClause = getActivityWhereClause(enabledMetrics);
 
     let result;
 
@@ -40,13 +83,13 @@ async function getLeaderboard(req, res) {
           ranked AS (
             SELECT *,
               DENSE_RANK() OVER (
-                ORDER BY flyers DESC, hours DESC, username ASC
+                ORDER BY ${orderClause}
               ) AS rank_position
             FROM stats
           )
           SELECT *
           FROM ranked
-          WHERE flyers > 0 OR hours > 0
+          WHERE ${activityWhereClause}
           ORDER BY rank_position ASC, username ASC
           `
         );
@@ -79,7 +122,7 @@ async function getLeaderboard(req, res) {
           ranked AS (
             SELECT *,
               DENSE_RANK() OVER (
-                ORDER BY flyers DESC, hours DESC, username ASC
+                ORDER BY ${orderClause}
               ) AS rank_position
             FROM stats
           )
@@ -161,6 +204,7 @@ async function getLeaderboard(req, res) {
       count: top10.length,
       data: top10,
       podium,
+      enabledMetrics,
       totalVolunteers,
       totalFlyers,
       totalScans,

@@ -26,14 +26,32 @@ export type LeaderboardResponse = {
   count: number;
   data: LeaderboardEntry[];
   podium: LeaderboardEntry[];
+  enabledMetrics?: {
+    flyers: boolean;
+    scans: boolean;
+    hours: boolean;
+  };
   totalVolunteers?: number;
   totalFlyers?: number;
   totalScans?: number;
   totalHours?: number;
 };
 
-export async function getLeaderboard(period: "all" | "month" | "week" = "all"): Promise<LeaderboardResponse> {
-  const response = await fetch(`${API_BASE}/api/leaderboard?period=${period}`);
+export async function getLeaderboard(
+  period: "all" | "month" | "week" = "all",
+  enabledMetrics: { flyers: boolean; scans: boolean; hours: boolean } = {
+    flyers: true,
+    scans: true,
+    hours: true,
+  },
+): Promise<LeaderboardResponse> {
+  const params = new URLSearchParams({
+    period,
+    includeFlyers: String(enabledMetrics.flyers),
+    includeScans: String(enabledMetrics.scans),
+    includeHours: String(enabledMetrics.hours),
+  });
+  const response = await fetch(`${API_BASE}/api/leaderboard?${params.toString()}`);
   const payload = await response.json();
   if (!response.ok) {
     throw new Error(payload.message || payload.error || "Failed to load leaderboard");

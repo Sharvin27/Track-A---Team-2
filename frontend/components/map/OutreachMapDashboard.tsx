@@ -194,6 +194,7 @@ const HOTSPOT_FETCH_LIMIT = 8000;
 export default function OutreachMapDashboard() {
   const router = useRouter();
   const { token, isGuest } = useAuth();
+  const [isMobile, setIsMobile] = useState(false);
   const [locations, setLocations] = useState<MapLocation[]>([]);
   const [printers, setPrinters] = useState<MapPrinter[]>([]);
   const [needRegions, setNeedRegions] = useState<MapNeedRegion[]>([]);
@@ -356,6 +357,22 @@ export default function OutreachMapDashboard() {
   const runRouteItemsLoad = useEffectEvent(() => {
     void loadRouteItems();
   });
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const mediaQuery = window.matchMedia("(max-width: 768px)");
+    const updateViewport = (event?: MediaQueryListEvent) => {
+      setIsMobile(event?.matches ?? mediaQuery.matches);
+    };
+
+    updateViewport();
+    mediaQuery.addEventListener("change", updateViewport);
+
+    return () => mediaQuery.removeEventListener("change", updateViewport);
+  }, []);
 
   useEffect(() => {
     runInitialLoad();
@@ -1479,9 +1496,11 @@ export default function OutreachMapDashboard() {
       <div
         style={{
           position: "absolute",
-          left: "50%",
-          bottom: 18,
-          transform: "translateX(-50%)",
+          left: isMobile ? "auto" : "50%",
+          right: isMobile ? 12 : "auto",
+          top: isMobile ? "50%" : "auto",
+          bottom: isMobile ? "auto" : 18,
+          transform: isMobile ? "translateY(-50%)" : "translateX(-50%)",
           zIndex: 500,
         }}
       >
@@ -1490,18 +1509,33 @@ export default function OutreachMapDashboard() {
           onClick={() => setIsTrackerMode(true)}
           disabled={isLoadingRouteItems}
           style={{
-            borderRadius: 999,
-            padding: "13px 18px",
+            display: "flex",
+            flexDirection: isMobile ? "column" : "row",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: isMobile ? 2 : 0,
+            width: isMobile ? 54 : "auto",
+            minHeight: isMobile ? 110 : "auto",
+            borderRadius: isMobile ? 18 : 999,
+            padding: isMobile ? "12px 10px" : "13px 18px",
             background: "linear-gradient(135deg, #1a1000 0%, #3a2700 100%)",
             border: "1px solid rgba(245,200,66,0.24)",
             color: "#fff7de",
             boxShadow: "0 16px 34px rgba(26,16,0,0.28)",
-            fontSize: 12.5,
+            fontSize: isMobile ? 11 : 12.5,
             fontWeight: 800,
+            lineHeight: 1.1,
             opacity: isLoadingRouteItems ? 0.7 : 1,
           }}
         >
-          {isLoadingRouteItems ? "Loading route..." : "Route Tracker"}
+          {isMobile ? (
+            <>
+              <span>{isLoadingRouteItems ? "Loading" : "Route"}</span>
+              <span>Tracker</span>
+            </>
+          ) : (
+            isLoadingRouteItems ? "Loading route..." : "Route Tracker"
+          )}
         </button>
       </div>
 
