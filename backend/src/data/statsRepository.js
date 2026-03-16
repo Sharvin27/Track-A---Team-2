@@ -7,12 +7,12 @@ async function upsertUserStatsForSession(userId, flyersDelta, hoursDelta, date) 
 
     await client.query(
       `
-      INSERT INTO user_stats (id, flyers, hours, updated_at)
+      INSERT INTO user_stats (id, flyers, hours, "updatedAt")
       VALUES ($1, $2, $3, NOW())
       ON CONFLICT (id) DO UPDATE SET
         flyers = user_stats.flyers + EXCLUDED.flyers,
         hours = user_stats.hours + EXCLUDED.hours,
-        updated_at = NOW()
+        "updatedAt" = NOW()
       `,
       [userId, flyersDelta, hoursDelta]
     );
