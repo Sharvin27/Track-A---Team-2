@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import Image from "next/image";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { ChangeEvent, CSSProperties, FormEvent } from "react";
 
 type CoverageProofModalProps = {
@@ -25,34 +26,47 @@ export default function CoverageProofModal({
 }: CoverageProofModalProps) {
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const previewUrlRef = useRef<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [notes, setNotes] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  const resetFormState = useCallback(() => {
+    if (previewUrlRef.current) {
+      URL.revokeObjectURL(previewUrlRef.current);
+      previewUrlRef.current = null;
+    }
+
+    setSelectedFile(null);
+    setPreviewUrl(null);
+    setNotes("");
+    setErrorMessage(null);
+    if (cameraInputRef.current) {
+      cameraInputRef.current.value = "";
+    }
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  }, []);
+
   useEffect(() => {
     if (!isOpen) {
-      setSelectedFile(null);
-      setPreviewUrl(null);
-      setNotes("");
-      setErrorMessage(null);
       return;
     }
-  }, [isOpen]);
-
-  useEffect(() => {
-    if (!selectedFile) {
-      setPreviewUrl(null);
-      return;
-    }
-
-    const nextPreviewUrl = URL.createObjectURL(selectedFile);
-    setPreviewUrl(nextPreviewUrl);
 
     return () => {
-      URL.revokeObjectURL(nextPreviewUrl);
+      resetFormState();
     };
-  }, [selectedFile]);
+  }, [isOpen, resetFormState]);
+
+  useEffect(() => {
+    return () => {
+      if (previewUrlRef.current) {
+        URL.revokeObjectURL(previewUrlRef.current);
+      }
+    };
+  }, []);
 
   if (!isOpen || !hotspot) {
     return null;
@@ -79,7 +93,16 @@ export default function CoverageProofModal({
 
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const nextFile = event.target.files?.[0] || null;
+
+    if (previewUrlRef.current) {
+      URL.revokeObjectURL(previewUrlRef.current);
+      previewUrlRef.current = null;
+    }
+
+    const nextPreviewUrl = nextFile ? URL.createObjectURL(nextFile) : null;
+    previewUrlRef.current = nextPreviewUrl;
     setSelectedFile(nextFile);
+    setPreviewUrl(nextPreviewUrl);
     setErrorMessage(null);
   }
 
@@ -142,7 +165,10 @@ export default function CoverageProofModal({
 
           <button
             type="button"
-            onClick={onClose}
+            onClick={() => {
+              resetFormState();
+              onClose();
+            }}
             disabled={isSubmitting}
             style={{
               width: 34,
@@ -232,9 +258,11 @@ export default function CoverageProofModal({
               }}
             >
               {previewUrl ? (
-                <img
+                <Image
                   src={previewUrl}
                   alt="Coverage proof preview"
+                  width={640}
+                  height={360}
                   style={{
                     display: "block",
                     width: "100%",
@@ -313,7 +341,10 @@ export default function CoverageProofModal({
           >
             <button
               type="button"
-              onClick={onClose}
+              onClick={() => {
+                resetFormState();
+                onClose();
+              }}
               disabled={isSubmitting}
               style={secondaryButtonStyle}
             >

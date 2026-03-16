@@ -83,7 +83,6 @@ export default function TrackerMap({
       style: "mapbox://styles/mapbox/outdoors-v12",
       center: FALLBACK_CENTER,
       zoom: 11,
-      preserveDrawingBuffer: true,
     });
 
     mapRef.current = map;
@@ -120,7 +119,8 @@ export default function TrackerMap({
       onSnapshotReady?.(async () => {
         try {
           return await captureRouteSnapshot({
-            map,
+            width: map.getCanvas().width,
+            height: map.getCanvas().height,
             routePoints: latestRoutePointsRef.current,
             stops: latestStopsRef.current,
             currentPoint: latestCurrentPointRef.current,
@@ -476,79 +476,107 @@ function getPlannedPinSvg(itemType: SavedRouteItem["itemType"]) {
 }
 
 async function captureRouteSnapshot({
-  map,
+  width,
+  height,
   routePoints,
   stops,
   currentPoint,
 }: {
-  map: mapboxgl.Map;
+  width: number;
+  height: number;
   routePoints: RoutePoint[];
   stops: SessionStop[];
   currentPoint: RoutePoint | null;
 }) {
-  const canvas = map.getCanvas();
-  if (!canvas.width || !canvas.height) {
+  if (
+    typeof document === "undefined" ||
+    !process.env.NEXT_PUBLIC_MAPBOX_TOKEN ||
+    !width ||
+    !height
+  ) {
     return null;
   }
 
-  const snapshotCanvas = document.createElement("canvas");
-  snapshotCanvas.width = canvas.width;
-  snapshotCanvas.height = canvas.height;
-  const context = snapshotCanvas.getContext("2d");
-  if (!context) {
-    return null;
-  }
+  const container = document.createElement("div");
+  container.style.position = "fixed";
+  container.style.left = "-20000px";
+  container.style.top = "0";
+  container.style.width = `${width}px`;
+  container.style.height = `${height}px`;
+  container.style.pointerEvents = "none";
+  container.style.opacity = "0";
+  document.body.appendChild(container);
 
-  const originalView = {
-    center: map.getCenter(),
-    zoom: map.getZoom(),
-    bearing: map.getBearing(),
-    pitch: map.getPitch(),
-  };
+  mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 
-  const pointsForBounds = [
-    ...routePoints.map((point) => [point.lng, point.lat] as [number, number]),
-    ...stops.map((stop) => [stop.lng, stop.lat] as [number, number]),
-  ];
-
-  if (pointsForBounds.length > 0) {
-    const bounds = pointsForBounds.reduce(
-      (accumulator, coordinate) => accumulator.extend(coordinate),
-      new mapboxgl.LngLatBounds(pointsForBounds[0], pointsForBounds[0])
-    );
-
-    map.fitBounds(bounds, {
-      padding: 56,
-      maxZoom: 15.5,
-      duration: 0,
-      essential: true,
-    });
-
-    await waitForMapIdle(map);
-  }
-
-  context.drawImage(canvas, 0, 0, snapshotCanvas.width, snapshotCanvas.height);
-
-  drawRouteLine(context, map, routePoints);
-  drawStopMarkers(context, map, stops);
-  drawTerminalMarker(context, map, routePoints[0], "#f8df5e", "#31401f", "S");
-  drawTerminalMarker(
-    context,
-    map,
-    currentPoint ?? routePoints[routePoints.length - 1],
-    "#6f8f2f",
-    "#fffdf2",
-    "E"
-  );
-
-  map.jumpTo({
-    center: originalView.center,
-    zoom: originalView.zoom,
-    bearing: originalView.bearing,
-    pitch: originalView.pitch,
+  const snapshotMap = new mapboxgl.Map({
+    container,
+    style: "mapbox://styles/mapbox/outdoors-v12",
+    center: FALLBACK_CENTER,
+    zoom: 11,
+    interactive: false,
+    preserveDrawingBuffer: true,
+    attributionControl: false,
+    fadeDuration: 0,
   });
 
-  return snapshotCanvas.toDataURL("image/png");
+  const snapshotCanvas = document.createElement("canvas");
+  snapshotCanvas.width = width;
+  snapshotCanvas.height = height;
+  const context = snapshotCanvas.getContext("2d");
+  if (!context) {
+    snapshotMap.remove();
+    container.remove();
+    return null;
+  }
+
+  try {
+    await waitForMapLoad(snapshotMap);
+
+    const pointsForBounds = [
+      ...routePoints.map((point) => [point.lng, point.lat] as [number, number]),
+      ...stops.map((stop) => [stop.lng, stop.lat] as [number, number]),
+    ];
+
+    if (pointsForBounds.length > 0) {
+      const bounds = pointsForBounds.slice(1).reduce(
+        (accumulator, coordinate) => accumulator.extend(coordinate),
+        new mapboxgl.LngLatBounds(pointsForBounds[0], pointsForBounds[0]),
+      );
+
+      snapshotMap.fitBounds(bounds, {
+        padding: 56,
+        maxZoom: 15.5,
+        duration: 0,
+        essential: true,
+      });
+    } else if (currentPoint) {
+      snapshotMap.jumpTo({
+        center: [currentPoint.lng, currentPoint.lat],
+        zoom: 15,
+      });
+    }
+
+    await waitForMapIdle(snapshotMap);
+
+    context.drawImage(snapshotMap.getCanvas(), 0, 0, snapshotCanvas.width, snapshotCanvas.height);
+    drawRouteLine(context, snapshotMap, routePoints);
+    drawStopMarkers(context, snapshotMap, stops);
+    drawTerminalMarker(context, snapshotMap, routePoints[0], "#f8df5e", "#31401f", "S");
+    drawTerminalMarker(
+      context,
+      snapshotMap,
+      currentPoint ?? routePoints[routePoints.length - 1],
+      "#6f8f2f",
+      "#fffdf2",
+      "E",
+    );
+
+    return snapshotCanvas.toDataURL("image/png");
+  } finally {
+    snapshotMap.remove();
+    container.remove();
+  }
 }
 
 function drawRouteLine(
@@ -638,6 +666,17 @@ function waitForMapIdle(map: mapboxgl.Map) {
     }
 
     map.once("idle", () => resolve());
+  });
+}
+
+function waitForMapLoad(map: mapboxgl.Map) {
+  return new Promise<void>((resolve) => {
+    if (map.loaded()) {
+      resolve();
+      return;
+    }
+
+    map.once("load", () => resolve());
   });
 }
 

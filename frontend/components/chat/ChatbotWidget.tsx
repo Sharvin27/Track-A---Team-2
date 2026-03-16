@@ -161,8 +161,16 @@ export default function ChatbotWidget() {
   const [showNudge, setShowNudge] = useState(false);
   const [nudgeDismissed, setNudgeDismissed] = useState(false);
   const [hasOpened, setHasOpened] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth <= 600);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
 
   // Conversation history for the API (role/content pairs)
   const historyRef = useRef<{ role: "user" | "assistant"; content: string }[]>([]);
@@ -272,15 +280,14 @@ export default function ChatbotWidget() {
       {open && (
         <div style={{
           position: "fixed",
-          bottom: 92,
-          right: 28,
-          width: 400,
-          minHeight: 550,
-          maxHeight: 780,
+          bottom: isMobile ? 0 : 92,
+          right: isMobile ? 0 : 28,
+          width: isMobile ? "100%" : 400,
+          height: isMobile ? "100%" : "min(70vh, 600px)",
           zIndex: 10001,
-          borderRadius: 20,
-          border: "1px solid rgba(190,155,70,0.22)",
-          boxShadow: "0 12px 48px rgba(0,0,0,0.16)",
+          borderRadius: isMobile ? 0 : 20,
+          border: isMobile ? "none" : "1px solid rgba(190,155,70,0.22)",
+          boxShadow: isMobile ? "none" : "0 12px 48px rgba(0,0,0,0.16)",
           display: "flex",
           flexDirection: "column",
           overflow: "hidden",

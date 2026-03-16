@@ -1,20 +1,16 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { HoverLink } from "@/components/common/HoverLink";
 import RecentActivity from "@/components/home/RecentActivity";
-
-/* ─── Data ───────────────────────────────── */
-const STATS = [
-  { label: "Flyers Distributed", value: "1,284", change: "+48 this week",       icon: "📄", iconBg: "#fef3c7" },
-  { label: "Active Volunteers",   value: "37",    change: "3 joined today",      icon: "🙌", iconBg: "#dcfce7" },
-  { label: "Zones Covered",       value: "12",    change: "2 new this month",    icon: "📍", iconBg: "#ede9fe" },
-  { label: "Resources Shared",    value: "94",    change: "↑ 18% vs last month", icon: "🍎", iconBg: "#fee2e2" },
-];
+import { getLeaderboard } from "@/lib/leaderboard-api";
 
 const QUICK = [
-  { href: "/map",         emoji: "🗺️", label: "Flyering Zones", desc: "Find where to distribute flyers today", bg: "#fef9c3", border: "#fde68a" },
-  { href: "/printers",    emoji: "🖨️", label: "Find a Printer",  desc: "Locate nearby print shops",            bg: "#ede9fe", border: "#ddd6fe" },
+  { href: "/map",         emoji: "🗺️", label: "Map",             desc: "Find high-need areas near you",        bg: "#fef9c3", border: "#fde68a" },
+  { href: "/guide",        emoji: "📖", label: "Guide",           desc: "Tips for effective flyering",           bg: "#ede9fe", border: "#ddd6fe" },
   { href: "/leaderboard", emoji: "🏆", label: "Leaderboard",     desc: "See this month's top volunteers",      bg: "#dcfce7", border: "#bbf7d0" },
-  { href: "/getstarted",  emoji: "🚀", label: "New Volunteer?",  desc: "Get started in 4 easy steps",          bg: "#fce7f3", border: "#fbcfe8" },
+  { href: "/community",   emoji: "💬", label: "Community",       desc: "Posts, meetups, and coordination",     bg: "#fce7f3", border: "#fbcfe8" },
 ];
 
 const card: React.CSSProperties = {
@@ -25,8 +21,28 @@ const card: React.CSSProperties = {
 };
 
 export default function HomePage() {
+  const [stats, setStats] = useState([
+    { label: "Total Scans",        value: "—", change: "Loading...",       icon: "📄", iconBg: "#fef3c7" },
+    { label: "Active Volunteers",   value: "—", change: "Loading...",      icon: "🙌", iconBg: "#dcfce7" },
+    { label: "Locations Covered",   value: "12", change: "Across NYC",     icon: "📍", iconBg: "#ede9fe" },
+    { label: "Total Hours",         value: "—", change: "Loading...",      icon: "⏱️", iconBg: "#fee2e2" },
+  ]);
+
+  useEffect(() => {
+    getLeaderboard("all")
+      .then((res) => {
+        setStats([
+          { label: "Total Scans",        value: (res.totalScans ?? 0).toLocaleString(), change: "All time",        icon: "📄", iconBg: "#fef3c7" },
+          { label: "Active Volunteers",   value: (res.totalVolunteers ?? 0).toLocaleString(), change: "Registered users", icon: "🙌", iconBg: "#dcfce7" },
+          { label: "Locations Covered",   value: "12",                                   change: "Across NYC",      icon: "📍", iconBg: "#ede9fe" },
+          { label: "Total Hours",         value: String(res.totalHours ?? 0),            change: "All time",        icon: "⏱️", iconBg: "#fee2e2" },
+        ]);
+      })
+      .catch(() => {});
+  }, []);
+
   return (
-    <div style={{ padding: "32px 36px", width: "100%" }}>
+    <div style={{ padding: "clamp(16px, 3vw, 32px) clamp(12px, 3vw, 36px)", width: "100%" }}>
 
       {/* ══ Hero Banner ══════════════════════════════════════════════ */}
       <div
@@ -58,7 +74,7 @@ export default function HomePage() {
           🍋
         </div>
 
-        <div style={{ position: "relative", zIndex: 1, padding: "36px 44px" }}>
+        <div style={{ position: "relative", zIndex: 1, padding: "clamp(24px, 4vw, 36px) clamp(20px, 4vw, 44px)" }}>
           <p style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase", color: "rgba(90,60,0,0.65)", marginBottom: 8 }}>
             Community Food Access
           </p>
@@ -89,8 +105,8 @@ export default function HomePage() {
       </div>
 
       {/* ══ Stats Row ════════════════════════════════════════════════ */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 24 }}>
-        {STATS.map((s, i) => (
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 16, marginBottom: 24 }}>
+        {stats.map((s, i) => (
           <div
             key={s.label}
             className={`anim-fade-up d${i + 2}`}
@@ -116,7 +132,7 @@ export default function HomePage() {
       {/* ══ Quick Actions + Activity ═════════════════════════════════ */}
       <div
         className="anim-fade-up d5"
-        style={{ display: "grid", gridTemplateColumns: "3fr 2fr", gap: 20, marginBottom: 20 }}
+        style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 20, marginBottom: 20 }}
       >
         {/* Quick Actions */}
         <div style={{ ...card, padding: "24px" }}>
@@ -124,7 +140,7 @@ export default function HomePage() {
             Quick Actions
           </h3>
           <p style={{ fontSize: 12, color: "#9a8a60", marginTop: 3, marginBottom: 18 }}>Jump to what you need</p>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12 }}>
             {QUICK.map((q) => (
               <HoverLink
                 key={q.href}
@@ -169,8 +185,8 @@ export default function HomePage() {
       <div
         className="anim-fade-up d6"
         style={{
-          display: "flex", alignItems: "center", justifyContent: "space-between",
-          padding: "22px 32px", borderRadius: 18,
+          display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap",
+          gap: 16, padding: "22px clamp(16px, 3vw, 32px)", borderRadius: 18,
           background: "linear-gradient(120deg, #1a1200 55%, #2c1e00 100%)",
           border: "1px solid rgba(245,200,66,0.14)",
           boxShadow: "0 4px 24px rgba(0,0,0,0.14)",
@@ -181,11 +197,11 @@ export default function HomePage() {
             Ready to make a real difference?
           </h4>
           <p style={{ fontSize: 12.5, color: "rgba(237,218,170,0.52)" }}>
-            Join 37 active volunteers and help connect your neighbors to free food resources.
+            Join {stats[1].value} active volunteers and help connect your neighbors to free food resources.
           </p>
         </div>
         <HoverLink
-          href="/map"
+          href="/getstarted"
           baseStyle={{
             flexShrink: 0, display: "flex", alignItems: "center", gap: 8,
             padding: "11px 24px", borderRadius: 12,
@@ -200,7 +216,7 @@ export default function HomePage() {
             boxShadow: "0 6px 24px rgba(245,200,66,0.45)",
           }}
         >
-          🗺️ Find My Zone
+          🚀 Get Started
         </HoverLink>
       </div>
 
