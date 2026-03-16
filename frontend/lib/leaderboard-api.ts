@@ -25,10 +25,13 @@ export type LeaderboardResponse = {
   count: number;
   data: LeaderboardEntry[];
   podium: LeaderboardEntry[];
+  totalVolunteers?: number;
+  totalScans?: number;
+  totalHours?: number;
 };
 
-export async function getLeaderboard(): Promise<LeaderboardResponse> {
-  const response = await fetch(`${API_BASE}/api/leaderboard`);
+export async function getLeaderboard(period: "all" | "month" | "week" = "all"): Promise<LeaderboardResponse> {
+  const response = await fetch(`${API_BASE}/api/leaderboard?period=${period}`);
   const payload = await response.json();
   if (!response.ok) {
     throw new Error(payload.message || payload.error || "Failed to load leaderboard");

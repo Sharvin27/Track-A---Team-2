@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import PageContainer from "@/components/layout/PageContainer";
 import SectionCard from "@/components/common/SectionCard";
 import GuestGate from "@/components/auth/GuestGate";
@@ -12,17 +12,17 @@ import DMChatWindow from "./DMChatWindow";
 import DMThreadList from "./DMThreadList";
 
 export default function MessagesPageClient({
-  threadId,
+  threadId: initialThreadId,
 }: {
   threadId?: number;
 }) {
   const { token, user, isGuest, logout } = useAuth();
-  const router = useRouter();
   const searchParams = useSearchParams();
   const [isMobile, setIsMobile] = useState(false);
   const [threads, setThreads] = useState<DMThread[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activeThreadId, setActiveThreadId] = useState<number | undefined>(initialThreadId);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia("(max-width: 980px)");
@@ -35,6 +35,7 @@ export default function MessagesPageClient({
     };
   }, []);
 
+  // Load threads once on mount
   useEffect(() => {
     let cancelled = false;
 
@@ -49,9 +50,8 @@ export default function MessagesPageClient({
         if (composeUserId) {
           const createdThread = await createOrGetThread(token, Number(composeUserId));
           if (!cancelled) {
-            router.replace(`/messages/${createdThread.data.id}`);
+            setActiveThreadId(createdThread.data.id);
           }
-          return;
         }
 
         const response = await getThreads(token);
@@ -75,8 +75,9 @@ export default function MessagesPageClient({
     return () => {
       cancelled = true;
     };
-  }, [token, isGuest, router, searchParams]);
+  }, [token, isGuest, searchParams]);
 
+  // Poll threads in background
   useEffect(() => {
     if (!token || isGuest) return;
 
@@ -125,7 +126,12 @@ export default function MessagesPageClient({
           ) : error ? (
             <p style={{ margin: 0, fontSize: 13, color: "#b91c1c" }}>{error}</p>
           ) : (
-            <DMThreadList threads={threads} token={token} />
+            <DMThreadList
+              threads={threads}
+              token={token}
+              activeThreadId={activeThreadId}
+              onSelectThread={setActiveThreadId}
+            />
           )}
         </SectionCard>
 
@@ -133,13 +139,13 @@ export default function MessagesPageClient({
           <SectionCard
             title="Conversation"
             subtitle={
-              threadId
-                ? "Polling keeps the thread fresh until you add realtime later."
+              activeThreadId
+                ? "Live thread"
                 : "Open a thread from the list or start one from a meetup or post."
             }
           >
             <DMChatWindow
-              threadId={threadId}
+              threadId={activeThreadId}
               token={token}
               currentUserId={user?.id}
             />
