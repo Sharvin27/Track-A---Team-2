@@ -1,6 +1,7 @@
 import Link from "next/link";
 import PageContainer from "@/components/layout/PageContainer";
 import SectionCard from "@/components/common/SectionCard";
+import GetFlyersWithQr from "@/components/getstarted/GetFlyersWithQr";
 
 const steps = [
   {
@@ -97,7 +98,9 @@ export default function GetStartedPage() {
                 <p style={{ fontSize: 13, color: "#5a4a20", lineHeight: 1.6, marginBottom: 14 }}>
                   {s.desc}
                 </p>
-                {s.href.startsWith("http") ? (
+                {s.step === "02" ? (
+                  <GetFlyersWithQr />
+                ) : s.href.startsWith("http") ? (
                   <a
                     href={s.href}
                     target="_blank"

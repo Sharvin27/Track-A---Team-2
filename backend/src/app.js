@@ -7,6 +7,7 @@ const authRoutes = require("./routes/authRoutes");
 const leaderboardRoutes = require("./routes/leaderboardRoutes");
 const activityRoutes = require("./routes/activityRoutes");
 const badgesRoutes = require("./routes/badgesRoutes");
+const qrRoutes = require("./routes/qrRoutes");
 const communityRoutes = require("./routes/communityRoutes");
 const meetupRoutes = require("./routes/meetupRoutes");
 const messageRoutes = require("./routes/messageRoutes");
@@ -30,5 +31,10 @@ app.use("/api/badges", badgesRoutes);
 app.use("/api/community", communityRoutes);
 app.use("/api/meetups", meetupRoutes);
 app.use("/api/messages", messageRoutes);
+
+app.use("/api/qr", qrRoutes);
+
+const { handleScanAndRedirect } = require("./controllers/qrController");
+app.get("/qr/:slug", handleScanAndRedirect);
 
 module.exports = app;
