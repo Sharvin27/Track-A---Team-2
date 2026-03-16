@@ -23,7 +23,7 @@
   --sidebar-bg: rgba(15, 12, 5, 0.80);
   --sidebar-text: #ede5cc;
   --sidebar-accent: #f5c842;
-  --gradient-hero: linear-gradient(135deg, #F0FDF4 0%, #FAFAF7 60%, #FEF9EE 100%);
+  --gradient-hero: linear-gradient(135deg, #FFFDF5 0%, #FAFAF7 60%, #FEF9EE 100%);
   --gradient-btn-primary: linear-gradient(135deg, #f5c842 0%, #e8a200 100%);
   --gradient-meetup-card: linear-gradient(145deg, #F0FDF4, #DCFCE7);
   --shadow-card: 0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04);

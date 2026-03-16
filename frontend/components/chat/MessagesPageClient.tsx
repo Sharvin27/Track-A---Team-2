@@ -45,7 +45,6 @@ export default function MessagesPageClient({
       }
 
       try {
-        setLoading(true);
         const composeUserId = searchParams.get("compose");
         if (composeUserId) {
           const createdThread = await createOrGetThread(token, Number(composeUserId));
@@ -126,7 +125,7 @@ export default function MessagesPageClient({
           ) : error ? (
             <p style={{ margin: 0, fontSize: 13, color: "#b91c1c" }}>{error}</p>
           ) : (
-            <DMThreadList threads={threads} />
+            <DMThreadList threads={threads} token={token} />
           )}
         </SectionCard>
 

@@ -86,10 +86,34 @@ export default function DMChatWindow({
     }
   }
 
+  function handleKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      void handleSend();
+    }
+  }
+
   if (!threadId) {
     return (
       <div style={placeholderStyle}>
-        Choose a DM thread to start chatting.
+        <svg
+          width="36"
+          height="36"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="rgba(190,155,70,0.35)"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+        </svg>
+        <div style={{ marginTop: 12, fontSize: 14, fontWeight: 600, color: "#5f502d" }}>
+          No conversation open
+        </div>
+        <div style={{ marginTop: 4, fontSize: 12.5, color: "#9a8a60", maxWidth: 260, lineHeight: 1.5 }}>
+          Pick a thread from the left, or start a new one from a post or meetup.
+        </div>
       </div>
     );
   }
@@ -130,45 +154,88 @@ export default function DMChatWindow({
           padding: 16,
           overflowY: "auto",
           display: "grid",
-          gap: 10,
+          gap: 4,
+          alignContent: "start",
           background:
-            "linear-gradient(180deg, rgba(255,254,249,1) 0%, rgba(246,250,240,1) 100%)",
+            "linear-gradient(180deg, rgba(255,254,249,1) 0%, rgba(255,252,240,1) 100%)",
         }}
       >
         {isLoading ? (
           <p style={{ margin: 0, fontSize: 12.5, color: "#8a7a50" }}>Loading messages...</p>
         ) : messages.length > 0 ? (
-          messages.map((message) => {
+          messages.map((message, index) => {
             const isMine = message.senderUserId === currentUserId;
+            const prev = index > 0 ? messages[index - 1] : null;
+            const next = index < messages.length - 1 ? messages[index + 1] : null;
+            const sameSenderAsPrev = prev?.senderUserId === message.senderUserId;
+            const sameSenderAsNext = next?.senderUserId === message.senderUserId;
+            const isLastInGroup = !sameSenderAsNext;
+
             return (
               <div
                 key={message.id}
                 style={{
                   justifySelf: isMine ? "end" : "start",
                   maxWidth: "76%",
-                  borderRadius: 18,
-                  padding: "11px 13px",
-                  background: isMine ? "rgba(217,249,157,0.92)" : "#ffffff",
-                  border: "1px solid rgba(190,155,70,0.16)",
-                  boxShadow: "0 8px 16px rgba(31,43,18,0.05)",
+                  marginTop: sameSenderAsPrev ? 0 : 8,
                 }}
               >
-                <div style={{ fontSize: 11, fontWeight: 800, color: "#4b5563", marginBottom: 4 }}>
-                  {formatDisplayName(message.sender)}
+                {!sameSenderAsPrev && (
+                  <div
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 700,
+                      color: "#8a7a50",
+                      marginBottom: 4,
+                      textAlign: isMine ? "right" : "left",
+                      padding: "0 4px",
+                    }}
+                  >
+                    {isMine ? "You" : formatDisplayName(message.sender)}
+                  </div>
+                )}
+                <div
+                  style={{
+                    borderRadius: sameSenderAsPrev
+                      ? 14
+                      : isMine
+                        ? "14px 14px 4px 14px"
+                        : "14px 14px 14px 4px",
+                    padding: "10px 13px",
+                    background: isMine ? "rgba(245,200,66,0.14)" : "#ffffff",
+                    border: isMine
+                      ? "1px solid rgba(245,200,66,0.22)"
+                      : "1px solid rgba(190,155,70,0.14)",
+                    boxShadow: "0 2px 6px rgba(0,0,0,0.03)",
+                  }}
+                >
+                  <div style={{ fontSize: 13, color: "#1f1a0b", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>
+                    {message.messageText}
+                  </div>
                 </div>
-                <div style={{ fontSize: 13, color: "#1f2b12", lineHeight: 1.5 }}>
-                  {message.messageText}
-                </div>
-                <div style={{ fontSize: 10.5, color: "#7c8a67", marginTop: 6 }}>
-                  {formatDateTime(message.createdAt)}
-                </div>
+                {isLastInGroup && (
+                  <div
+                    style={{
+                      fontSize: 10.5,
+                      color: "#9a8a60",
+                      marginTop: 3,
+                      textAlign: isMine ? "right" : "left",
+                      padding: "0 4px",
+                    }}
+                  >
+                    {formatDateTime(message.createdAt)}
+                  </div>
+                )}
               </div>
             );
           })
         ) : (
-          <p style={{ margin: 0, fontSize: 12.5, color: "#8a7a50" }}>
-            No messages yet. Say hello.
-          </p>
+          <div style={{ textAlign: "center", padding: "40px 20px" }}>
+            <div style={{ fontSize: 28, marginBottom: 8 }}>👋</div>
+            <div style={{ fontSize: 13, color: "#8a7a50" }}>
+              No messages yet. Say hello!
+            </div>
+          </div>
         )}
         <div ref={endRef} />
       </div>
@@ -177,41 +244,49 @@ export default function DMChatWindow({
         style={{
           borderTop: "1px solid rgba(190,155,70,0.16)",
           padding: 14,
-          display: "grid",
+          display: "flex",
           gap: 10,
+          alignItems: "flex-end",
           background: "#ffffff",
         }}
       >
         <textarea
           value={messageText}
           onChange={(event) => setMessageText(event.target.value)}
-          rows={3}
-          placeholder="Send a direct message"
+          onKeyDown={handleKeyDown}
+          rows={1}
+          placeholder="Type a message..."
           style={{
-            width: "100%",
+            flex: 1,
             borderRadius: 14,
             border: "1px solid rgba(190,155,70,0.22)",
-            background: "#ffffff",
-            padding: "12px 14px",
+            background: "#faf9f6",
+            padding: "10px 14px",
             fontSize: 13,
-            resize: "vertical",
+            resize: "none",
             outline: "none",
+            minHeight: 40,
+            maxHeight: 120,
+            lineHeight: 1.5,
           }}
         />
-        {error ? (
-          <p style={{ margin: 0, fontSize: 12, color: "#b91c1c" }}>{error}</p>
-        ) : null}
-        <div>
-          <button
-            type="button"
-            disabled={isSending}
-            onClick={() => void handleSend()}
-            style={{ ...primaryButtonStyle, opacity: isSending ? 0.72 : 1 }}
-          >
-            {isSending ? "Sending..." : "Send DM"}
-          </button>
-        </div>
+        <button
+          type="button"
+          disabled={isSending || !messageText.trim()}
+          onClick={() => void handleSend()}
+          style={{
+            ...primaryButtonStyle,
+            opacity: isSending || !messageText.trim() ? 0.55 : 1,
+            flexShrink: 0,
+            padding: "10px 18px",
+          }}
+        >
+          {isSending ? "..." : "Send"}
+        </button>
       </div>
+      {error ? (
+        <div style={{ padding: "0 14px 10px", fontSize: 12, color: "#b91c1c" }}>{error}</div>
+      ) : null}
     </div>
   );
 }
@@ -219,12 +294,12 @@ export default function DMChatWindow({
 const placeholderStyle: React.CSSProperties = {
   minHeight: 560,
   borderRadius: 22,
-  border: "1px dashed rgba(190,155,70,0.26)",
-  background: "rgba(255,255,255,0.72)",
+  border: "1px dashed rgba(190,155,70,0.20)",
+  background: "rgba(255,253,245,0.72)",
   display: "flex",
+  flexDirection: "column",
   alignItems: "center",
   justifyContent: "center",
   padding: 24,
   textAlign: "center",
-  color: "#8a7a50",
 };

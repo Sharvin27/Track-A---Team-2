@@ -5,6 +5,7 @@ const {
   getThread,
   listThreadMessages,
   listThreads,
+  searchUsers,
 } = require("../controllers/messageController");
 const { requireAuth } = require("../middleware/requireAuth");
 
@@ -12,6 +13,7 @@ const router = express.Router();
 
 router.use(requireAuth);
 
+router.get("/users/search", searchUsers);
 router.get("/threads", listThreads);
 router.post("/threads", createThread);
 router.get("/threads/:id", getThread);
