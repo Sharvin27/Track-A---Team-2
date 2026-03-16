@@ -21,12 +21,18 @@ function getPool() {
   }
 
   const isSupabase = connectionString.includes("supabase");
-  const ssl =
-    process.env.NODE_ENV === "production"
-      ? { rejectUnauthorized: true }
-      : isSupabase
-        ? { rejectUnauthorized: false }
-        : false;
+  // const ssl =
+  //   process.env.NODE_ENV === "production"
+  //     ? { rejectUnauthorized: true }
+  //     : isSupabase
+  //       ? { rejectUnauthorized: false }
+  //       : false;
+
+  const ssl = isSupabase
+  ? { rejectUnauthorized: false }
+  : process.env.NODE_ENV === "production"
+  ? { rejectUnauthorized: true }
+  : false;
 
   pool = new Pool({
     connectionString,
