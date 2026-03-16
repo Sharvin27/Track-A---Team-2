@@ -1,79 +1,23 @@
 const { pool } = require("../db");
 
-const FLYER_WEIGHT = 1.5;
+function getDateFilter(period) {
+  if (period === "week") return "NOW() - INTERVAL '7 days'";
+  if (period === "month") return "DATE_TRUNC('month', NOW())";
+  return null;
+}
 
 async function getLeaderboard(req, res) {
   try {
+    const period = req.query.period || "all";
+    const dateFilter = getDateFilter(period);
+
     let result;
-    try {
-      result = await pool.query(
-      `
-      WITH stats AS (
-        SELECT
-          users.id,
-          users.username,
-          users.email,
-          users.created_at,
-          users.agreed_to_terms,
-          profile_photos.image_url AS profile_photo_url,
-          COALESCE(user_stats.flyers, 0)::BIGINT AS flyers,
-          COALESCE(user_stats.hours, 0)::DOUBLE PRECISION AS hours
-        FROM users
-        LEFT JOIN profile_photos ON profile_photos.user_id = users.id
-        LEFT JOIN user_stats ON user_stats.id = users.id
-      ),
-      ranked AS (
-        SELECT
-          id,
-          username,
-          email,
-          created_at,
-          agreed_to_terms,
-          profile_photo_url,
-          flyers,
-          hours,
-          (flyers * ($1::double precision) + hours) AS weighted_score,
-          DENSE_RANK() OVER (
-            ORDER BY (flyers * ($1::double precision) + hours) DESC, hours DESC, username ASC
-          ) AS rank_position
-        FROM stats
-      ),
-      by_hours AS (
-        SELECT
-          id,
-          username,
-          email,
-          created_at,
-          agreed_to_terms,
-          profile_photo_url,
-          flyers,
-          hours,
-          DENSE_RANK() OVER (ORDER BY hours DESC, flyers DESC, username ASC) AS hours_rank
-        FROM stats
-      )
-      SELECT
-        r.id,
-        r.username,
-        r.email,
-        r.created_at,
-        r.agreed_to_terms,
-        r.profile_photo_url,
-        r.flyers,
-        r.hours,
-        r.weighted_score,
-        r.rank_position,
-        h.hours_rank
-      FROM ranked r
-      JOIN by_hours h ON h.id = r.id
-      ORDER BY r.rank_position ASC, r.username ASC
-      `,
-      [FLYER_WEIGHT]
-      );
-    } catch (queryErr) {
-      const msg = queryErr.message || "";
-      if (msg.includes("user_stats") && (msg.includes("does not exist") || msg.includes("relation"))) {
-        result = await pool.query(`
-          WITH base AS (
+
+    if (dateFilter) {
+      try {
+        result = await pool.query(
+          `
+          WITH stats AS (
             SELECT
               users.id,
               users.username,
@@ -81,18 +25,88 @@ async function getLeaderboard(req, res) {
               users.created_at,
               users.agreed_to_terms,
               profile_photos.image_url AS profile_photo_url,
-              0::BIGINT AS flyers,
-              0::DOUBLE PRECISION AS hours
+              COALESCE(SUM(uda.flyers), 0)::BIGINT AS flyers,
+              COALESCE(SUM(uda.hours), 0)::DOUBLE PRECISION AS hours
             FROM users
             LEFT JOIN profile_photos ON profile_photos.user_id = users.id
+            LEFT JOIN user_daily_activity uda
+              ON uda.user_id = users.id
+              AND uda.date >= ${dateFilter}
+            GROUP BY users.id, users.username, users.email, users.created_at,
+                     users.agreed_to_terms, profile_photos.image_url
           ),
-          numbered AS (
-            SELECT *, ROW_NUMBER() OVER (ORDER BY username ASC)::INTEGER AS rank_position, ROW_NUMBER() OVER (ORDER BY username ASC)::INTEGER AS hours_rank FROM base
+          ranked AS (
+            SELECT *,
+              DENSE_RANK() OVER (
+                ORDER BY flyers DESC, hours DESC, username ASC
+              ) AS rank_position
+            FROM stats
           )
-          SELECT * FROM numbered ORDER BY rank_position ASC
-        `);
-      } else {
+          SELECT *
+          FROM ranked
+          WHERE flyers > 0 OR hours > 0
+          ORDER BY rank_position ASC, username ASC
+          `
+        );
+      } catch (queryErr) {
+        const msg = queryErr.message || "";
+        if (msg.includes("user_daily_activity") && (msg.includes("does not exist") || msg.includes("relation"))) {
+          return res.json({ success: true, count: 0, data: [], podium: [] });
+        }
         throw queryErr;
+      }
+    } else {
+      try {
+        result = await pool.query(
+          `
+          WITH stats AS (
+            SELECT
+              users.id,
+              users.username,
+              users.email,
+              users.created_at,
+              users.agreed_to_terms,
+              profile_photos.image_url AS profile_photo_url,
+              COALESCE(user_stats.flyers, 0)::BIGINT AS flyers,
+              COALESCE(user_stats.hours, 0)::DOUBLE PRECISION AS hours
+            FROM users
+            LEFT JOIN profile_photos ON profile_photos.user_id = users.id
+            LEFT JOIN user_stats ON user_stats.id = users.id
+          ),
+          ranked AS (
+            SELECT *,
+              DENSE_RANK() OVER (
+                ORDER BY flyers DESC, hours DESC, username ASC
+              ) AS rank_position
+            FROM stats
+          )
+          SELECT *
+          FROM ranked
+          ORDER BY rank_position ASC, username ASC
+          `
+        );
+      } catch (queryErr) {
+        const msg = queryErr.message || "";
+        if (msg.includes("user_stats") && (msg.includes("does not exist") || msg.includes("relation"))) {
+          result = await pool.query(`
+            WITH base AS (
+              SELECT
+                users.id, users.username, users.email, users.created_at,
+                users.agreed_to_terms,
+                profile_photos.image_url AS profile_photo_url,
+                0::BIGINT AS flyers, 0::DOUBLE PRECISION AS hours
+              FROM users
+              LEFT JOIN profile_photos ON profile_photos.user_id = users.id
+            ),
+            numbered AS (
+              SELECT *, ROW_NUMBER() OVER (ORDER BY username ASC)::INTEGER AS rank_position
+              FROM base
+            )
+            SELECT * FROM numbered ORDER BY rank_position ASC
+          `);
+        } else {
+          throw queryErr;
+        }
       }
     }
 
@@ -110,11 +124,10 @@ async function getLeaderboard(req, res) {
       total_distance_meters: 0,
       total_stops: 0,
       rank: row.rank_position,
-      hours_rank: row.hours_rank,
     }));
 
-    const podium = result.rows
-      .sort((a, b) => (a.hours_rank ?? 999) - (b.hours_rank ?? 999))
+    const podium = [...result.rows]
+      .sort((a, b) => (a.rank_position ?? 999) - (b.rank_position ?? 999))
       .slice(0, 3)
       .map((row, index) => ({
         id: row.id,
@@ -127,14 +140,24 @@ async function getLeaderboard(req, res) {
         hours: Number(row.hours ?? 0),
         total_duration_seconds: Math.round(Number(row.hours ?? 0) * 3600),
         rank: index + 1,
-        hours_rank: index + 1,
       }));
+
+    const top10 = data.slice(0, 10);
+
+    const totalUsersResult = await pool.query(`SELECT COUNT(*)::int AS total FROM users`);
+    const totalVolunteers = totalUsersResult.rows[0]?.total ?? 0;
+
+    const totalScans = data.reduce((sum, row) => sum + row.flyers, 0);
+    const totalHours = data.reduce((sum, row) => sum + row.hours, 0);
 
     return res.json({
       success: true,
-      count: data.length,
-      data,
+      count: top10.length,
+      data: top10,
       podium,
+      totalVolunteers,
+      totalScans,
+      totalHours: Math.round(totalHours * 10) / 10,
     });
   } catch (error) {
     console.error("Leaderboard error:", error);

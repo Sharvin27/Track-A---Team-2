@@ -164,7 +164,7 @@ export default function DMChatWindow({
           <p style={{ margin: 0, fontSize: 12.5, color: "#8a7a50" }}>Loading messages...</p>
         ) : messages.length > 0 ? (
           messages.map((message, index) => {
-            const isMine = message.senderUserId === currentUserId;
+            const isMine = Number(message.senderUserId) === Number(currentUserId);
             const prev = index > 0 ? messages[index - 1] : null;
             const next = index < messages.length - 1 ? messages[index + 1] : null;
             const sameSenderAsPrev = prev?.senderUserId === message.senderUserId;
