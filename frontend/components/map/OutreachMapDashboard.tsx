@@ -238,19 +238,6 @@ export default function OutreachMapDashboard() {
   const selectedPlacementTarget = selectedLocation
     ? mapLocationToPlacementTarget(selectedLocation)
     : null;
-  const drawerSuggestions = selectedLocation
-    ? getDrawerSuggestions(selectedLocation, rankedLocations).map((location) => ({
-        id: location.id,
-        target: mapLocationToPlacementTarget(location),
-        distanceLabel: `${getDistanceMiles(
-          selectedLocation.lat,
-          selectedLocation.lng,
-          location.lat,
-          location.lng,
-        ).toFixed(1)} mi away`,
-        selected: location.id === selectedLocation.id,
-      }))
-    : [];
 
   const runInitialLoad = useEffectEvent(() => {
     void loadStoredHotspots(true);
@@ -788,7 +775,6 @@ export default function OutreachMapDashboard() {
         open={Boolean(selectedLocation && selectedPlacementTarget)}
         location={selectedLocation}
         target={selectedPlacementTarget}
-        suggestions={drawerSuggestions}
         onClose={() => setSelectedLocationId(null)}
         onOpenDirections={() => {
           if (selectedLocation) {
@@ -796,15 +782,6 @@ export default function OutreachMapDashboard() {
           }
         }}
         onOpenVerification={handleOpenVerificationForSelectedLocation}
-        onOpenVerificationForSuggestion={(id) => {
-          const location =
-            rankedLocations.find((entry) => entry.id === id) || null;
-          if (!location) return;
-
-          setSelectedLocationId(location.id);
-          handleOpenVerificationForLocation(location);
-        }}
-        onSelectSuggestion={setSelectedLocationId}
       />
 
       <PlacementProofModal
@@ -1187,35 +1164,6 @@ function isVerifiedLocation(
   location: Pick<MapLocation, "placementStatus" | "covered">,
 ) {
   return getPlacementStatusForLocation(location) === "verified";
-}
-
-function getDrawerSuggestions(
-  selectedLocation: RankedLocation,
-  rankedLocations: RankedLocation[],
-) {
-  return rankedLocations
-    .filter((location) => location.id !== selectedLocation.id)
-    .sort((left, right) => {
-      const leftDistance = getDistanceMiles(
-        selectedLocation.lat,
-        selectedLocation.lng,
-        left.lat,
-        left.lng,
-      );
-      const rightDistance = getDistanceMiles(
-        selectedLocation.lat,
-        selectedLocation.lng,
-        right.lat,
-        right.lng,
-      );
-
-      if (leftDistance !== rightDistance) {
-        return leftDistance - rightDistance;
-      }
-
-      return right.priorityScore - left.priorityScore;
-    })
-    .slice(0, 3);
 }
 
 function formatPlacementResult(status: PlacementSubmissionResult["status"]) {

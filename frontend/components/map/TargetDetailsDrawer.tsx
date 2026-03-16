@@ -1,8 +1,6 @@
 "use client";
 
-import PlacementTargetCard, {
-  getPlacementActionLabel,
-} from "@/components/map/PlacementTargetCard";
+import { getPlacementActionLabel } from "@/components/map/PlacementTargetCard";
 import VerificationBadge from "@/components/map/VerificationBadge";
 import type { PlacementTarget } from "@/types/placement";
 import type { CSSProperties, ReactNode } from "react";
@@ -22,33 +20,20 @@ type DrawerLocation = {
   verifiedCount?: number;
 };
 
-type DrawerSuggestion = {
-  id: string;
-  target: PlacementTarget;
-  distanceLabel: string;
-  selected: boolean;
-};
-
 export default function TargetDetailsDrawer({
   open,
   location,
   target,
-  suggestions,
   onClose,
   onOpenDirections,
   onOpenVerification,
-  onOpenVerificationForSuggestion,
-  onSelectSuggestion,
 }: {
   open: boolean;
   location: DrawerLocation | null;
   target: PlacementTarget | null;
-  suggestions: DrawerSuggestion[];
   onClose: () => void;
   onOpenDirections: () => void;
   onOpenVerification: () => void;
-  onOpenVerificationForSuggestion: (id: string) => void;
-  onSelectSuggestion: (id: string) => void;
 }) {
   if (!open || !location || !target) {
     return null;
@@ -59,7 +44,8 @@ export default function TargetDetailsDrawer({
       style={{
         position: "absolute",
         right: 18,
-        bottom: 18,
+        top: "50%",
+        transform: "translateY(-50%)",
         width: 332,
         maxWidth: "calc(100vw - 36px)",
         zIndex: 500,
@@ -72,7 +58,6 @@ export default function TargetDetailsDrawer({
           borderRadius: 24,
           padding: "16px 16px 14px",
           background: "rgba(26,22,11,0.92)",
-          border: "1px solid rgba(245,200,66,0.14)",
           color: "#fff7de",
           backdropFilter: "blur(18px)",
           boxShadow: "0 22px 40px rgba(17,14,6,0.24)",
@@ -142,16 +127,22 @@ export default function TargetDetailsDrawer({
           </p>
         ) : null}
 
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "nowrap",
+            gap: 8,
+            marginBottom: 12,
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
           <VerificationBadge status={target.status} />
           <Pill>{location.derivedPriority} priority</Pill>
-          <Pill>{location.distanceMiles.toFixed(1)} mi away</Pill>
-          <Pill>Score {location.priorityScore.toFixed(1)}</Pill>
-          {typeof target.latestVerificationScore === "number" ? (
-            <Pill>Verification {target.latestVerificationScore}</Pill>
-          ) : null}
           {typeof target.verifiedCount === "number" && target.verifiedCount > 0 ? (
-            <Pill>{target.verifiedCount} verified uploads</Pill>
+            <Pill style={{ marginLeft: "auto" }}>
+              {target.verifiedCount} verified uploads
+            </Pill>
           ) : null}
         </div>
 
@@ -187,40 +178,18 @@ export default function TargetDetailsDrawer({
             {getPlacementActionLabel(target.status)}
           </button>
         </div>
-
-        {suggestions.length > 0 ? (
-          <div style={{ marginTop: 14 }}>
-            <p
-              style={{
-                margin: "0 0 8px",
-                fontSize: 11,
-                letterSpacing: "0.08em",
-                textTransform: "uppercase",
-                color: "rgba(245,200,66,0.50)",
-              }}
-            >
-              Nearby suggestions
-            </p>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {suggestions.map((suggestion) => (
-                <PlacementTargetCard
-                  key={suggestion.id}
-                  target={suggestion.target}
-                  distanceLabel={suggestion.distanceLabel}
-                  selected={suggestion.selected}
-                  onSelect={() => onSelectSuggestion(suggestion.id)}
-                  onVerify={() => onOpenVerificationForSuggestion(suggestion.id)}
-                />
-              ))}
-            </div>
-          </div>
-        ) : null}
       </div>
     </div>
   );
 }
 
-function Pill({ children }: { children: ReactNode }) {
+function Pill({
+  children,
+  style,
+}: {
+  children: ReactNode;
+  style?: CSSProperties;
+}) {
   return (
     <span
       style={{
@@ -230,6 +199,9 @@ function Pill({ children }: { children: ReactNode }) {
         color: "rgba(255,247,222,0.82)",
         fontSize: 11.5,
         fontWeight: 700,
+        whiteSpace: "nowrap",
+        flexShrink: 0,
+        ...style,
       }}
     >
       {children}
