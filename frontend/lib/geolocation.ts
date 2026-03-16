@@ -9,6 +9,8 @@ const DEFAULT_OPTIONS: PositionOptions = {
 
 const MAX_ACCEPTED_ACCURACY_METERS = 80;
 const MIN_MOVEMENT_METERS = 4;
+const MAX_IMPOSSIBLE_SPEED_METERS_PER_SECOND = 12;
+const MAX_ZERO_TIME_JUMP_METERS = 80;
 
 export function createRoutePoint(position: GeolocationPosition): RoutePoint {
   return {
@@ -54,7 +56,28 @@ export function shouldAppendRoutePoint(points: RoutePoint[], nextPoint: RoutePoi
     return false;
   }
 
-  return haversineDistanceMeters(previousPoint, nextPoint) >= MIN_MOVEMENT_METERS;
+  const distanceMeters = haversineDistanceMeters(previousPoint, nextPoint);
+  if (distanceMeters < MIN_MOVEMENT_METERS) {
+    return false;
+  }
+
+  const previousTimestamp = Date.parse(previousPoint.timestamp);
+  const nextTimestamp = Date.parse(nextPoint.timestamp);
+  const elapsedSeconds = Math.max(0, (nextTimestamp - previousTimestamp) / 1000);
+
+  if (elapsedSeconds === 0 && distanceMeters > MAX_ZERO_TIME_JUMP_METERS) {
+    return false;
+  }
+
+  if (
+    elapsedSeconds > 0 &&
+    distanceMeters / elapsedSeconds > MAX_IMPOSSIBLE_SPEED_METERS_PER_SECOND &&
+    distanceMeters > MAX_ZERO_TIME_JUMP_METERS
+  ) {
+    return false;
+  }
+
+  return true;
 }
 
 export function startLocationWatch(

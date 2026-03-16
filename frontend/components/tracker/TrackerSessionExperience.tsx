@@ -19,6 +19,7 @@ import {
   createSessionStop,
   formatDuration,
 } from "@/lib/session";
+import { normalizeVolunteerSession } from "@/lib/tracker-route";
 import type { SavedRouteItem } from "@/types/route-items";
 import type {
   RoutePoint,
@@ -64,7 +65,17 @@ export default function TrackerSessionExperience({
   const [isShareOpen, setIsShareOpen] = useState(false);
 
   const isTracking = activeSession?.status === "tracking";
-  const displayedSession = activeSession ?? lastCompletedSession;
+  const normalizedActiveSession = useMemo(
+    () => (activeSession ? normalizeVolunteerSession(activeSession) : null),
+    [activeSession],
+  );
+  const displayedSession = useMemo(
+    () => {
+      const nextSession = activeSession ?? lastCompletedSession;
+      return nextSession ? normalizeVolunteerSession(nextSession) : null;
+    },
+    [activeSession, lastCompletedSession],
+  );
   const orderedPlannedItems = useMemo(
     () =>
       [...plannedItems].sort(
@@ -127,21 +138,23 @@ export default function TrackerSessionExperience({
       };
     }
 
-    const durationSeconds =
-      activeSession
+      const durationSeconds =
+      normalizedActiveSession
         ? Math.max(
             0,
-            Math.round((Date.now() - new Date(activeSession.startTime).getTime()) / 1000),
+            Math.round((Date.now() - new Date(normalizedActiveSession.startTime).getTime()) / 1000),
           )
         : displayedSession.durationSeconds;
 
+    const statsSession = normalizedActiveSession ?? displayedSession;
+
     return {
-      points: displayedSession.routePoints.length,
-      stops: displayedSession.stops.length,
+      points: statsSession.routePoints.length,
+      stops: statsSession.stops.length,
       duration: formatDuration(durationSeconds),
-      distance: formatDistance(displayedSession.totalDistanceMeters),
+      distance: formatDistance(statsSession.totalDistanceMeters),
     };
-  }, [activeSession, displayedSession]);
+  }, [displayedSession, normalizedActiveSession]);
 
   const handleSnapshotReady = useCallback((capture: (() => Promise<string | null>) | null) => {
     captureSnapshotRef.current = capture;
@@ -149,18 +162,17 @@ export default function TrackerSessionExperience({
 
   function handlePosition(position: GeolocationPosition) {
     const nextPoint = createRoutePoint(position);
-    setCurrentPoint(nextPoint);
     setErrorMessage(null);
     setStatusMessage("Tracking live route.");
+    let acceptedPoint = false;
 
     setActiveSession((current) => {
       if (!current) {
         return current;
       }
 
-      const nextRoutePoints = shouldAppendRoutePoint(current.routePoints, nextPoint)
-        ? [...current.routePoints, nextPoint]
-        : current.routePoints;
+      acceptedPoint = shouldAppendRoutePoint(current.routePoints, nextPoint);
+      const nextRoutePoints = acceptedPoint ? [...current.routePoints, nextPoint] : current.routePoints;
 
       return {
         ...current,
@@ -168,6 +180,10 @@ export default function TrackerSessionExperience({
         totalDistanceMeters: calculateRouteDistanceMeters(nextRoutePoints),
       };
     });
+
+    if (acceptedPoint) {
+      setCurrentPoint(nextPoint);
+    }
   }
 
   function handlePositionError(error: GeolocationPositionError) {

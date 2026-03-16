@@ -1,5 +1,9 @@
 const repository = require("../data/sessionRepository");
 const statsRepository = require("../data/statsRepository");
+const {
+  normalizeRoutePoints,
+  normalizeSessionStops,
+} = require("./sessionNormalization");
 
 const METERS_TO_MILES = 0.000621371;
 
@@ -95,6 +99,8 @@ function normalizeSessionPayload(payload, userId) {
     : Array.isArray(payload.stops)
       ? payload.stops
       : [];
+  const normalizedRoutePoints = normalizeRoutePoints(routePoints);
+  const normalizedStops = normalizeSessionStops(stops);
 
   const startedAtValue = payload.started_at ?? payload.startedAt ?? payload.startTime;
   const endedAtValue = payload.ended_at ?? payload.endedAt ?? payload.endTime;
@@ -114,13 +120,13 @@ function normalizeSessionPayload(payload, userId) {
   const distanceMeters =
     toFiniteNumber(payload.distance_meters ?? payload.distanceMeters ?? payload.totalDistanceMeters, -1);
   const resolvedDistanceMeters =
-    distanceMeters >= 0 ? distanceMeters : calculateDistanceMeters(routePoints);
+    distanceMeters >= 0 ? distanceMeters : calculateDistanceMeters(normalizedRoutePoints);
   const distanceMiles = toFiniteNumber(
     payload.distance_miles ?? payload.distanceMiles,
     resolvedDistanceMeters * METERS_TO_MILES
   );
-  const firstPoint = routePoints[0] ?? null;
-  const lastPoint = routePoints[routePoints.length - 1] ?? null;
+  const firstPoint = normalizedRoutePoints[0] ?? null;
+  const lastPoint = normalizedRoutePoints[normalizedRoutePoints.length - 1] ?? null;
 
   return {
     userId: resolvedUserId,
@@ -134,8 +140,8 @@ function normalizeSessionPayload(payload, userId) {
     ),
     distanceMeters: resolvedDistanceMeters,
     distanceMiles,
-    routePoints,
-    stops,
+    routePoints: normalizedRoutePoints,
+    stops: normalizedStops,
     routeImageUrl: payload.route_image_url ?? payload.routeImageUrl ?? null,
     startLat: payload.start_lat ?? payload.startLat ?? firstPoint?.lat ?? null,
     startLng: payload.start_lng ?? payload.startLng ?? firstPoint?.lng ?? null,

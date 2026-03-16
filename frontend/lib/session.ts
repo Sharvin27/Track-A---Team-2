@@ -1,4 +1,5 @@
 import { calculateRouteDistanceMeters } from "@/lib/distance";
+import { normalizeRoutePoints, normalizeSessionStops } from "@/lib/tracker-route";
 import type { RoutePoint, SessionStop, StopType, VolunteerSession } from "@/types/tracker";
 
 export function createSession(): VolunteerSession {
@@ -27,16 +28,20 @@ export function createSessionStop(point: RoutePoint, type: StopType, label?: str
 
 export function completeSession(session: VolunteerSession): VolunteerSession {
   const endTime = new Date().toISOString();
+  const routePoints = normalizeRoutePoints(session.routePoints);
+  const stops = normalizeSessionStops(session.stops);
 
   return {
     ...session,
     endTime,
     status: "completed",
+    routePoints,
+    stops,
     durationSeconds: Math.max(
       0,
       Math.round((new Date(endTime).getTime() - new Date(session.startTime).getTime()) / 1000),
     ),
-    totalDistanceMeters: calculateRouteDistanceMeters(session.routePoints),
+    totalDistanceMeters: calculateRouteDistanceMeters(routePoints),
   };
 }
 

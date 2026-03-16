@@ -14,6 +14,12 @@ import { getSessions } from "@/lib/session-api";
 import { getBadges, type BadgesData } from "@/lib/badges-api";
 import { getLeaderboard, type LeaderboardEntry } from "@/lib/leaderboard-api";
 import {
+  getMyCoverageProofs,
+  submitProfileCoverageProof,
+  type ProofRecord,
+} from "@/lib/hotspot-proof-api";
+import { extractGpsFromImageFile } from "@/lib/exif-gps";
+import {
   generateCertificatePdf,
   generateCertificatePng,
   downloadBlob,
@@ -59,6 +65,7 @@ function buildActivityTitle(session: VolunteerSession) {
 export default function ProfilePage() {
   const { user, token, loading, isGuest, setUser, logout } = useAuth();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const profileProofInputRef = useRef<HTMLInputElement | null>(null);
   const [sessions, setSessions] = useState<VolunteerSession[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(true);
   const [sessionsError, setSessionsError] = useState<string | null>(null);
@@ -73,6 +80,13 @@ export default function ProfilePage() {
   const [leaderboardLoading, setLeaderboardLoading] = useState(true);
   const [certificateLoading, setCertificateLoading] = useState<"idle" | "pdf" | "png">("idle");
   const [certificateError, setCertificateError] = useState<string | null>(null);
+  const [proofs, setProofs] = useState<ProofRecord[]>([]);
+  const [proofsLoading, setProofsLoading] = useState(true);
+  const [proofsError, setProofsError] = useState<string | null>(null);
+  const [selectedProofIndex, setSelectedProofIndex] = useState<number | null>(null);
+  const [profileProofState, setProfileProofState] = useState<"idle" | "uploading" | "error" | "success">("idle");
+  const [profileProofMessage, setProfileProofMessage] = useState<string | null>(null);
+  const [showProofUploadTooltip, setShowProofUploadTooltip] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -171,6 +185,42 @@ export default function ProfilePage() {
     };
   }, [isGuest]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!token || isGuest) {
+      setProofs([]);
+      setProofsLoading(false);
+      setProofsError(null);
+      return;
+    }
+
+    setProofsLoading(true);
+    setProofsError(null);
+
+    getMyCoverageProofs(token)
+      .then((data) => {
+        if (!cancelled) {
+          setProofs(data);
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setProofs([]);
+          setProofsError(error instanceof Error ? error.message : "Could not load proof uploads.");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setProofsLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isGuest, token]);
+
   const { myRankEntry, personAhead } = useMemo(() => {
     if (!user?.id || !leaderboardEntries.length) {
       return { myRankEntry: null, personAhead: null };
@@ -181,17 +231,17 @@ export default function ProfilePage() {
   }, [user?.id, leaderboardEntries]);
 
   const stats = useMemo(() => {
-    const totalDistanceMeters = sessions.reduce((total, session) => total + session.totalDistanceMeters, 0);
     const totalDurationSeconds = sessions.reduce((total, session) => total + session.durationSeconds, 0);
-    const totalStops = sessions.reduce((total, session) => total + session.stops.length, 0);
+    const flyersUploaded = badgesData?.flyers ?? 0;
+    const scanCount = badgesData?.scans ?? 0;
 
     return [
-      { label: "Route Sessions", value: sessions.length.toString(), icon: "RS", iconBg: "#fef3c7" },
-      { label: "Stops Logged", value: totalStops.toString(), icon: "ST", iconBg: "#ecfccb" },
+      { label: "Flyers Uploaded", value: flyersUploaded.toLocaleString(), icon: "FL", iconBg: "#fef3c7" },
+      { label: "QR Scans", value: scanCount.toLocaleString(), icon: "SC", iconBg: "#ecfccb" },
       { label: "Hours Volunteered", value: formatCompactHours(totalDurationSeconds), icon: "HR", iconBg: "#dcfce7" },
-      { label: "Distance Walked", value: formatDistance(totalDistanceMeters), icon: "KM", iconBg: "#d9f99d" },
+      { label: "Route Sessions", value: sessions.length.toString(), icon: "RS", iconBg: "#d9f99d" },
     ];
-  }, [sessions]);
+  }, [badgesData?.flyers, badgesData?.scans, sessions]);
 
   const recentSessions = sessions.slice(0, 5);
   const displayName = user?.full_name?.trim() || user?.username || "Volunteer";
@@ -221,6 +271,65 @@ export default function ProfilePage() {
     } catch (error) {
       setPhotoState("error");
       setPhotoError(error instanceof Error ? error.message : "Could not upload photo.");
+    } finally {
+      event.target.value = "";
+    }
+  }
+
+  async function handleProfileProofSelection(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file || !token) {
+      return;
+    }
+
+    if (!file.type.startsWith("image/")) {
+      setProfileProofState("error");
+      setProfileProofMessage("Please choose an image file.");
+      event.target.value = "";
+      return;
+    }
+
+    try {
+      setProfileProofState("uploading");
+      setProfileProofMessage("Reading photo metadata...");
+
+      const coordinates = await extractGpsFromImageFile(file);
+      if (!coordinates) {
+        throw new Error(
+          "This profile upload needs a GPS-tagged photo. Turn on camera location metadata and use the original image.",
+        );
+      }
+
+      const result = await submitProfileCoverageProof(token, file, coordinates);
+
+      setProofs((current) => [result.proof, ...current]);
+      setBadgesData((current) =>
+        current
+          ? {
+              ...current,
+              flyers: (current.flyers ?? 0) + 1,
+            }
+          : current,
+      );
+      setSelectedProofIndex(0);
+      setProfileProofState("success");
+      setProfileProofMessage(
+        result.usedExistingHotspot
+          ? "Proof uploaded and matched to a nearby hotspot on the map."
+          : "Proof uploaded and added as a new covered spot from the photo GPS metadata.",
+      );
+
+      try {
+        const leaderboardResponse = await getLeaderboard();
+        setLeaderboardEntries(leaderboardResponse.data ?? []);
+      } catch {
+        // Keep the local success state even if the leaderboard refresh fails.
+      }
+    } catch (error) {
+      setProfileProofState("error");
+      setProfileProofMessage(
+        error instanceof Error ? error.message : "Could not upload proof from profile.",
+      );
     } finally {
       event.target.value = "";
     }
@@ -338,6 +447,116 @@ export default function ProfilePage() {
                     <span style={{ fontSize: 13, color: "#5a5f2f" }}>{item.label}</span>
                   </div>
                 ))}
+              </div>
+
+              <div
+                style={{
+                  width: "100%",
+                  marginTop: 14,
+                  padding: "12px 14px",
+                  borderRadius: 16,
+                  background: "#fdf8ec",
+                  border: "1px solid rgba(190,155,70,0.18)",
+                  textAlign: "left",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
+                  <div>
+                    <p style={{ margin: 0, fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#8a8f51" }}>
+                      Flyer Proofs
+                    </p>
+                    <p style={{ margin: "6px 0 0", fontSize: 13, color: "#42531d" }}>
+                      {proofsLoading
+                        ? "Loading uploaded proofs..."
+                        : `${proofs.length} proof image${proofs.length === 1 ? "" : "s"} saved`}
+                    </p>
+                  </div>
+                  <div
+                    style={{ position: "relative", flexShrink: 0 }}
+                    onMouseEnter={() => setShowProofUploadTooltip(true)}
+                    onMouseLeave={() => setShowProofUploadTooltip(false)}
+                    onFocus={() => setShowProofUploadTooltip(true)}
+                    onBlur={() => setShowProofUploadTooltip(false)}
+                  >
+                    <input
+                      ref={profileProofInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleProfileProofSelection}
+                      style={{ display: "none" }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => profileProofInputRef.current?.click()}
+                      disabled={!token || profileProofState === "uploading"}
+                      aria-label="Upload proof"
+                      style={{
+                        width: 34,
+                        height: 34,
+                        borderRadius: 999,
+                        border: "1px solid rgba(185,207,81,0.34)",
+                        background: "rgba(185,207,81,0.14)",
+                        color: "#4d5c1e",
+                        fontSize: 18,
+                        fontWeight: 700,
+                        cursor: profileProofState === "uploading" ? "not-allowed" : "pointer",
+                      }}
+                    >
+                      +
+                    </button>
+                    {showProofUploadTooltip ? (
+                      <div
+                        style={{
+                          position: "absolute",
+                          right: 0,
+                          top: 40,
+                          padding: "5px 8px",
+                          borderRadius: 6,
+                          background: "#243112",
+                          color: "#fffdf2",
+                          fontSize: 11,
+                          whiteSpace: "nowrap",
+                          boxShadow: "0 8px 18px rgba(0,0,0,0.18)",
+                        }}
+                      >
+                        Upload proof
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+                {proofsError ? (
+                  <p style={{ margin: "8px 0 0", fontSize: 12, color: "#b91c1c" }}>{proofsError}</p>
+                ) : null}
+                {profileProofMessage ? (
+                  <p
+                    style={{
+                      margin: "8px 0 0",
+                      fontSize: 12,
+                      color: profileProofState === "error" ? "#b91c1c" : "#4d7c0f",
+                      lineHeight: 1.45,
+                    }}
+                  >
+                    {profileProofState === "uploading" ? "Reading photo metadata..." : profileProofMessage}
+                  </p>
+                ) : null}
+                <button
+                  type="button"
+                  disabled={proofsLoading || proofs.length === 0}
+                  onClick={() => setSelectedProofIndex(0)}
+                  style={{
+                    marginTop: 10,
+                    padding: "8px 12px",
+                    borderRadius: 999,
+                    border: "1px solid rgba(185,207,81,0.34)",
+                    background: proofs.length > 0 ? "rgba(185,207,81,0.14)" : "rgba(0,0,0,0.04)",
+                    color: proofs.length > 0 ? "#4d5c1e" : "#9ca3af",
+                    fontSize: 11.5,
+                    fontWeight: 700,
+                    cursor: proofsLoading || proofs.length === 0 ? "not-allowed" : "pointer",
+                  }}
+                >
+                  View uploaded proofs
+                </button>
               </div>
 
               {!isGuest ? (
@@ -780,6 +999,111 @@ export default function ProfilePage() {
                   transition: "width 150ms ease",
                 }}
               />
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {selectedProofIndex !== null && proofs[selectedProofIndex] ? (
+        <div
+          aria-hidden="true"
+          onClick={() => setSelectedProofIndex(null)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(22,30,10,0.72)",
+            padding: isMobile ? 16 : 28,
+            zIndex: 90,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <div
+            onClick={(event) => event.stopPropagation()}
+            style={{
+              width: "min(100%, 760px)",
+              borderRadius: 24,
+              overflow: "hidden",
+              background: "#fffdf2",
+              boxShadow: "0 24px 60px rgba(0,0,0,0.24)",
+              border: "1px solid rgba(185,207,81,0.22)",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 12,
+                padding: "14px 16px",
+                borderBottom: "1px solid rgba(190,155,70,0.16)",
+              }}
+            >
+              <div>
+                <p style={{ margin: 0, fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#8a8f51" }}>
+                  Flyer proof {selectedProofIndex + 1} of {proofs.length}
+                </p>
+                <p style={{ margin: "4px 0 0", fontSize: 15, fontWeight: 700, color: "#243112" }}>
+                  {proofs[selectedProofIndex].hotspotName || "Hotspot proof"}
+                </p>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <button
+                  type="button"
+                  disabled={selectedProofIndex === 0}
+                  onClick={() => setSelectedProofIndex((current) => (current === null ? current : Math.max(0, current - 1)))}
+                  style={zoomButtonStyle}
+                >
+                  Prev
+                </button>
+                <button
+                  type="button"
+                  disabled={selectedProofIndex >= proofs.length - 1}
+                  onClick={() => setSelectedProofIndex((current) => (current === null ? current : Math.min(proofs.length - 1, current + 1)))}
+                  style={zoomButtonStyle}
+                >
+                  Next
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedProofIndex(null)}
+                  style={zoomButtonStyle}
+                >
+                  X
+                </button>
+              </div>
+            </div>
+            <div style={{ padding: 16, background: "#f7f3df" }}>
+              <Image
+                src={proofs[selectedProofIndex].photoUrl}
+                alt={proofs[selectedProofIndex].hotspotName || "Flyer proof"}
+                width={1200}
+                height={900}
+                unoptimized
+                style={{
+                  display: "block",
+                  width: "100%",
+                  height: "auto",
+                  maxHeight: "60vh",
+                  objectFit: "contain",
+                  borderRadius: 18,
+                  background: "#efe8c7",
+                }}
+              />
+              <div style={{ display: "grid", gap: 6, marginTop: 14 }}>
+                <p style={{ margin: 0, fontSize: 12.5, color: "#42531d" }}>
+                  {proofs[selectedProofIndex].hotspotAddress || "Address unavailable"}
+                </p>
+                <p style={{ margin: 0, fontSize: 12, color: "#7a6a40" }}>
+                  Submitted {new Date(proofs[selectedProofIndex].submittedAt).toLocaleString()}
+                </p>
+                {proofs[selectedProofIndex].notes ? (
+                  <p style={{ margin: 0, fontSize: 12.5, color: "#5a5f2f", lineHeight: 1.55 }}>
+                    {proofs[selectedProofIndex].notes}
+                  </p>
+                ) : null}
+              </div>
             </div>
           </div>
         </div>
