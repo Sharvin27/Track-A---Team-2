@@ -10,6 +10,7 @@ interface Section {
   body: React.ReactNode;
   media: "image" | "video";
   mediaNote: string;
+  imageSrc?: string;
 }
 
 const sections: Section[] = [
@@ -19,13 +20,15 @@ const sections: Section[] = [
     body: "1 in 8 Americans need help with food. Not because there isn't enough, but because they don't know where to find it. Lemontree connects families to free pantries, fridges, and food programs nearby, and you're about to help us reach more. One flyer. One family. That's the math.",
     media: "image",
     mediaNote: "Photo — volunteer handing a flyer to a neighbor on the street.",
+    imageSrc: "/guide-mission.jpg",
   },
   {
     emoji: "📄",
     title: "Getting Your Flyers",
     body: <>Head to the <a href="/getstarted" style={{ color: "#d97706", fontWeight: 600, textDecoration: "none" }}>Get Started</a> page or visit <a href="https://www.foodhelpline.org/share" target="_blank" rel="noreferrer" style={{ color: "#d97706", fontWeight: 600, textDecoration: "none" }}>foodhelpline.org/share</a> to generate a custom flyer for your area. Takes 30 seconds. Print 50 to 100 copies at a nearby copy shop — Staples, FedEx, or your local library. Usually under $10 total.</>,
-    media: "video",
-    mediaNote: "Video — walkthrough of downloading the flyer and printing at a copy shop.",
+    media: "image",
+    mediaNote: "Photo — printing flyers at a copy shop.",
+    imageSrc: "https://images.unsplash.com/photo-1562564055-71e051d33c19?w=960&h=540&fit=crop",
   },
   {
     emoji: "📍",
@@ -33,13 +36,15 @@ const sections: Section[] = [
     body: "Think: anywhere neighbors slow down. Laundromats, cafes, church lobbies, community boards, barbershops. Use the Map to find high-need areas near you. Always ask before leaving flyers inside a business — most people are happy to help.",
     media: "image",
     mediaNote: "Photo — community bulletin board or laundromat with flyers pinned up.",
+    imageSrc: "https://images.unsplash.com/photo-1572025442646-866d16c84a54?w=960&h=540&fit=crop",
   },
   {
     emoji: "🤝",
-    title: "Talking to People", 
+    title: "Talking to People",
     body: "The whole pitch is three words: free food nearby. Just say: \"Hi, I'm volunteering with Lemontree. Here's a flyer about free food in the neighborhood.\" You don't have to explain everything. The flyer does the heavy lifting.",
-    media: "video",
-    mediaNote: "Video — short roleplay of a volunteer approaching someone and handing them a flyer.",
+    media: "image",
+    mediaNote: "Photo — volunteers talking to community members.",
+    imageSrc: "https://images.unsplash.com/photo-1531206715517-5c0ba140b2b8?w=960&h=540&fit=crop",
   },
   {
     emoji: "⚖️",
@@ -47,6 +52,7 @@ const sections: Section[] = [
     body: "Good news: flyering in public is protected by the First Amendment. One hard rule though: never put anything in a mailbox. Federal offense, no exceptions. On private property, just ask. Most people say yes.",
     media: "image",
     mediaNote: "Photo — public sidewalk on one side, private property / 'no trespassing' sign contrast on the other.",
+    imageSrc: "https://images.unsplash.com/photo-1517457373958-b7bdd4587205?w=960&h=540&fit=crop",
   },
   {
     emoji: "🔒",
@@ -54,6 +60,7 @@ const sections: Section[] = [
     body: "Stick to daylight hours and busy streets. Bring a friend if you can, it makes the route faster and more fun. If someone gets confrontational about the flyers, don't engage. Just move on. And dress for the weather. You'll be outside longer than you think.",
     media: "image",
     mediaNote: "Photo — two volunteers walking together on a well-lit street during the day.",
+    imageSrc: "https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=960&h=540&fit=crop",
   },
 ];
 
@@ -123,6 +130,20 @@ export default function GuidePage() {
         {/* Media side */}
         <div style={{ position: "relative", height: isMobile ? 160 : undefined, flexShrink: 0 }}>
           {s.media === "image" ? (
+            s.imageSrc ? (
+              <div style={{
+                height: "100%",
+                borderRight: isMobile ? "none" : "1px solid rgba(190,155,70,0.12)",
+                borderBottom: isMobile ? "1px solid rgba(190,155,70,0.12)" : "none",
+                overflow: "hidden",
+              }}>
+                <img
+                  src={s.imageSrc}
+                  alt={s.mediaNote}
+                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                />
+              </div>
+            ) : (
             <div style={{
               height: "100%",
               background: "rgba(245,200,66,0.08)",
@@ -135,6 +156,7 @@ export default function GuidePage() {
               <span style={{ fontSize: 12, fontWeight: 600 }}>Image placeholder</span>
               <span style={{ fontSize: 11.5, color: "#c8b888", lineHeight: 1.5 }}>{s.mediaNote}</span>
             </div>
+            )
           ) : (
             <div style={{
               height: "100%",
