@@ -1,13 +1,13 @@
 const { pool, query } = require("../db");
 const { createError, normalizeLimit } = require("./serviceUtils");
 
-function userJson(userAlias, photoAlias) {
+function userJson(userAlias, photoAlias, includePhoto = false) {
   return `
     json_build_object(
       'id', ${userAlias}.id,
       'username', ${userAlias}.username,
       'fullName', NULLIF(${userAlias}.full_name, ''),
-      'profilePhotoUrl', ${photoAlias}.image_url
+      'profilePhotoUrl', ${includePhoto ? `${photoAlias}.image_url` : "NULL"}
     )
   `;
 }
@@ -81,7 +81,7 @@ function getThreadSelect() {
         'id', other_users.id,
         'username', other_users.username,
         'fullName', NULLIF(other_users.full_name, ''),
-        'profilePhotoUrl', other_users.image_url
+        'profilePhotoUrl', NULL
       ) AS other_user,
       last_message.message_text AS last_message_text,
       last_message.created_at AS last_message_at,
