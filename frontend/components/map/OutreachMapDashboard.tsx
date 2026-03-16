@@ -1534,6 +1534,7 @@ function getVisibleMeetups(meetups: MeetupSummary[], viewport: MapViewportState)
     meetup.lng >= viewport.bounds!.west,
   );
 }
+
 function getHighlightedRegions(
   regions: MapNeedRegion[],
   regionLocationCounts: Map<string, number>,
