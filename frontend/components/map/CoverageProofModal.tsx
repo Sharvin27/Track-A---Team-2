@@ -27,6 +27,7 @@ export default function CoverageProofModal({
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const previewUrlRef = useRef<string | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [notes, setNotes] = useState("");
@@ -49,6 +50,46 @@ export default function CoverageProofModal({
       fileInputRef.current.value = "";
     }
   }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const mediaQuery = window.matchMedia("(max-width: 768px)");
+    const updateViewport = (event?: MediaQueryListEvent) => {
+      setIsMobile(event?.matches ?? mediaQuery.matches);
+    };
+
+    updateViewport();
+    mediaQuery.addEventListener("change", updateViewport);
+
+    return () => mediaQuery.removeEventListener("change", updateViewport);
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen || typeof document === "undefined") {
+      return;
+    }
+
+    const { body, documentElement } = document;
+    const previousBodyOverflow = body.style.overflow;
+    const previousHtmlOverflow = documentElement.style.overflow;
+    const previousBodyOverscroll = body.style.overscrollBehavior;
+    const previousHtmlOverscroll = documentElement.style.overscrollBehavior;
+
+    body.style.overflow = "hidden";
+    documentElement.style.overflow = "hidden";
+    body.style.overscrollBehavior = "contain";
+    documentElement.style.overscrollBehavior = "contain";
+
+    return () => {
+      body.style.overflow = previousBodyOverflow;
+      documentElement.style.overflow = previousHtmlOverflow;
+      body.style.overscrollBehavior = previousBodyOverscroll;
+      documentElement.style.overscrollBehavior = previousHtmlOverscroll;
+    };
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -113,18 +154,22 @@ export default function CoverageProofModal({
         inset: 0,
         zIndex: 1200,
         display: "flex",
-        alignItems: "center",
+        alignItems: isMobile ? "flex-start" : "center",
         justifyContent: "center",
-        padding: "max(12px, calc(env(safe-area-inset-top) + 8px)) 16px max(12px, calc(env(safe-area-inset-bottom) + 8px))",
+        padding: isMobile
+          ? "max(8px, calc(env(safe-area-inset-top) + 6px)) 12px max(8px, calc(env(safe-area-inset-bottom) + 8px))"
+          : "max(12px, calc(env(safe-area-inset-top) + 8px)) 16px max(12px, calc(env(safe-area-inset-bottom) + 8px))",
         background: "rgba(8, 10, 8, 0.56)",
         backdropFilter: "blur(10px)",
+        overflowY: "auto",
+        overscrollBehavior: "contain",
       }}
     >
       <div
         style={{
           width: "min(100%, 540px)",
-          maxHeight: "calc(100dvh - 24px)",
-          borderRadius: 24,
+          maxHeight: isMobile ? "min(78dvh, 680px)" : "calc(100dvh - 24px)",
+          borderRadius: isMobile ? 20 : 24,
           border: "1px solid rgba(74, 222, 128, 0.18)",
           background:
             "linear-gradient(180deg, rgba(20, 28, 21, 0.98) 0%, rgba(13, 19, 15, 0.98) 100%)",
@@ -137,7 +182,7 @@ export default function CoverageProofModal({
       >
         <div
           style={{
-            padding: "20px 22px 18px",
+            padding: isMobile ? "14px 16px 12px" : "20px 22px 18px",
             borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
             display: "flex",
             justifyContent: "space-between",
@@ -157,10 +202,10 @@ export default function CoverageProofModal({
             >
               Verify hotspot coverage
             </p>
-            <h3 style={{ margin: "8px 0 6px", fontSize: 24, lineHeight: 1.1 }}>
+            <h3 style={{ margin: "8px 0 6px", fontSize: isMobile ? 20 : 24, lineHeight: 1.1 }}>
               {hotspot.name}
             </h3>
-            <p style={{ margin: 0, fontSize: 13, lineHeight: 1.55, color: "rgba(239,255,243,0.72)" }}>
+            <p style={{ margin: 0, fontSize: isMobile ? 12 : 13, lineHeight: 1.5, color: "rgba(239,255,243,0.72)" }}>
               Upload a quick photo of the flyer placement. On mobile, the camera option can open
               your rear camera directly.
             </p>
@@ -192,11 +237,12 @@ export default function CoverageProofModal({
         <form
           onSubmit={handleSubmit}
           style={{
-            padding: 22,
+            padding: isMobile ? 16 : 22,
             display: "grid",
-            gap: 16,
+            gap: isMobile ? 14 : 16,
             overflowY: "auto",
             WebkitOverflowScrolling: "touch",
+            overscrollBehavior: "contain",
           }}
         >
           <div
@@ -235,7 +281,7 @@ export default function CoverageProofModal({
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+                gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(160px, 1fr))",
                 gap: 10,
               }}
             >
@@ -262,7 +308,7 @@ export default function CoverageProofModal({
                 borderRadius: 18,
                 border: "1px dashed rgba(134, 239, 172, 0.28)",
                 background: "rgba(22, 163, 74, 0.05)",
-                minHeight: 220,
+                minHeight: isMobile ? 160 : 220,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -278,7 +324,7 @@ export default function CoverageProofModal({
                   style={{
                     display: "block",
                     width: "100%",
-                    maxHeight: 320,
+                    maxHeight: isMobile ? 220 : 320,
                     objectFit: "cover",
                   }}
                 />
@@ -310,7 +356,7 @@ export default function CoverageProofModal({
             <textarea
               value={notes}
               onChange={(event) => setNotes(event.target.value)}
-              rows={4}
+              rows={isMobile ? 3 : 4}
               maxLength={600}
               placeholder="Anything useful about the placement, visibility, or condition?"
               style={{

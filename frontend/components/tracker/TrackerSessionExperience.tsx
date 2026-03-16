@@ -355,134 +355,7 @@ export default function TrackerSessionExperience({
         height="100%"
         onSnapshotReady={handleSnapshotReady}
         overlay={
-          isMobile ? (
-            <>
-              <div style={{ display: "grid", gap: 8 }}>
-                <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-                  <div
-                    style={{
-                      flex: 1,
-                      minWidth: 0,
-                      padding: "10px 12px",
-                      borderRadius: 16,
-                      background: "rgba(26,18,0,0.72)",
-                      color: "#fff8e8",
-                      backdropFilter: "blur(14px)",
-                      pointerEvents: "auto",
-                    }}
-                  >
-                    <p
-                      style={{
-                        margin: 0,
-                        fontSize: 11,
-                        fontWeight: 700,
-                        letterSpacing: "0.1em",
-                        textTransform: "uppercase",
-                        color: "rgba(245,200,66,0.76)",
-                      }}
-                    >
-                      Route Tracker
-                    </p>
-                    <p
-                      style={{
-                        margin: "4px 0 0",
-                        fontSize: 16,
-                        fontWeight: 700,
-                        lineHeight: 1.15,
-                      }}
-                    >
-                      {statusMessage}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={onExit}
-                    style={{
-                      alignSelf: "flex-start",
-                      borderRadius: 16,
-                      padding: "11px 12px",
-                      background: "rgba(26,18,0,0.72)",
-                      color: "#fff8e8",
-                      border: "1px solid rgba(245,200,66,0.16)",
-                      backdropFilter: "blur(14px)",
-                      fontSize: 11.5,
-                      fontWeight: 800,
-                    }}
-                  >
-                    Back
-                  </button>
-                </div>
-                <div
-                  style={{
-                    display: "inline-flex",
-                    alignSelf: "flex-start",
-                    padding: "8px 10px",
-                    borderRadius: 14,
-                    background: "rgba(255,248,232,0.14)",
-                    color: "#fff1c7",
-                    backdropFilter: "blur(12px)",
-                    pointerEvents: "auto",
-                    gap: 8,
-                    alignItems: "baseline",
-                  }}
-                >
-                  <p
-                    style={{
-                      margin: 0,
-                      fontSize: 10.5,
-                      fontWeight: 700,
-                      letterSpacing: "0.08em",
-                      textTransform: "uppercase",
-                      color: "rgba(245,200,66,0.72)",
-                    }}
-                  >
-                    Planned
-                  </p>
-                  <p style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>
-                    {plannedItems.length}
-                  </p>
-                </div>
-              </div>
-              <div
-                style={{
-                  display: "grid",
-                  gap: 8,
-                  justifyItems: "center",
-                  marginBottom: 72,
-                }}
-              >
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-                    gap: 8,
-                    width: "min(100%, 290px)",
-                    pointerEvents: "auto",
-                  }}
-                >
-                  <OverlayPill label="Points" value={String(liveStats.points)} compact />
-                  <OverlayPill label="Stops" value={String(liveStats.stops)} compact />
-                  <OverlayPill label="Time" value={liveStats.duration} compact />
-                  <OverlayPill label="Distance" value={liveStats.distance} compact />
-                </div>
-                <div
-                  style={{
-                    padding: "9px 12px",
-                    borderRadius: 999,
-                    background: "rgba(26,18,0,0.74)",
-                    color: "#fff8e8",
-                    fontSize: 11.5,
-                    fontWeight: 700,
-                    backdropFilter: "blur(12px)",
-                    pointerEvents: "auto",
-                    textAlign: "center",
-                  }}
-                >
-                  {isTracking ? "Route is updating" : "Planned markers only until you start"}
-                </div>
-              </div>
-            </>
-          ) : (
+          isMobile ? null : (
             <>
               <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
                 <div
@@ -599,6 +472,94 @@ export default function TrackerSessionExperience({
           )
         }
       />
+
+      {isMobile ? (
+        <div
+          style={{
+            position: "absolute",
+            top: 14,
+            left: 14,
+            right: 14,
+            zIndex: 650,
+            display: "flex",
+            gap: 8,
+            alignItems: "flex-start",
+            pointerEvents: "none",
+          }}
+        >
+          <div
+            style={{
+              flex: 1,
+              minWidth: 0,
+              padding: "10px 12px",
+              borderRadius: 18,
+              background: "rgba(26,18,0,0.76)",
+              color: "#fff8e8",
+              backdropFilter: "blur(14px)",
+              pointerEvents: "auto",
+              boxShadow: "0 16px 32px rgba(17,14,6,0.18)",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: 11,
+                  fontWeight: 700,
+                  letterSpacing: "0.1em",
+                  textTransform: "uppercase",
+                  color: "rgba(245,200,66,0.76)",
+                }}
+              >
+                Route Tracker
+              </p>
+              <span
+                style={{
+                  padding: "4px 8px",
+                  borderRadius: 999,
+                  background: "rgba(255,248,232,0.12)",
+                  color: "#fff1c7",
+                  fontSize: 10.5,
+                  fontWeight: 700,
+                }}
+              >
+                Planned {plannedItems.length}
+              </span>
+            </div>
+            <p
+              style={{
+                margin: "5px 0 0",
+                fontSize: 15,
+                fontWeight: 700,
+                lineHeight: 1.15,
+              }}
+            >
+              {statusMessage}
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={onExit}
+            style={{
+              pointerEvents: "auto",
+              flexShrink: 0,
+              minHeight: 48,
+              borderRadius: 18,
+              padding: "0 14px",
+              background: "rgba(26,18,0,0.82)",
+              color: "#fff8e8",
+              border: "1px solid rgba(245,200,66,0.16)",
+              backdropFilter: "blur(14px)",
+              fontSize: 12,
+              fontWeight: 800,
+              boxShadow: "0 16px 32px rgba(17,14,6,0.18)",
+            }}
+          >
+            Back
+          </button>
+        </div>
+      ) : null}
 
       {selectedPlannedItem ? (
         <div
@@ -741,21 +702,36 @@ export default function TrackerSessionExperience({
             transform: "translateX(-50%)",
             zIndex: 500,
             display: "grid",
-            gap: 10,
+            gap: 8,
             justifyItems: "center",
             pointerEvents: "none",
             width: "calc(100% - 24px)",
           }}
         >
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+              gap: 8,
+              width: "min(100%, 292px)",
+              pointerEvents: "auto",
+            }}
+          >
+            <OverlayPill label="Points" value={String(liveStats.points)} compact />
+            <OverlayPill label="Stops" value={String(liveStats.stops)} compact />
+            <OverlayPill label="Time" value={liveStats.duration} compact />
+            <OverlayPill label="Distance" value={liveStats.distance} compact />
+          </div>
+
           {isMobileControlsOpen ? (
             <div
               style={{
                 width: "min(360px, 100%)",
-                maxHeight: "min(56dvh, 520px)",
+                maxHeight: "min(48dvh, 460px)",
                 overflowY: "auto",
                 pointerEvents: "auto",
                 borderRadius: 24,
-                padding: 16,
+                padding: 14,
                 background: "rgba(255,252,244,0.97)",
                 border: "1px solid rgba(190,155,70,0.18)",
                 backdropFilter: "blur(18px)",
@@ -792,9 +768,9 @@ export default function TrackerSessionExperience({
             style={{
               pointerEvents: "auto",
               minWidth: 156,
-              minHeight: 52,
+              minHeight: 50,
               borderRadius: 999,
-              padding: "12px 20px",
+              padding: "11px 20px",
               background: "linear-gradient(135deg, rgba(26,18,0,0.92) 0%, rgba(58,39,0,0.96) 100%)",
               border: "1px solid rgba(245,200,66,0.24)",
               color: "#fff7de",
