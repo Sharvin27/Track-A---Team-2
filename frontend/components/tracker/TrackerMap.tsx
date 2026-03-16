@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import mapboxgl, { GeoJSONSource } from "mapbox-gl";
 import type { RoutePoint, SessionStop } from "@/types/tracker";
 import type { SavedRouteItem } from "@/types/route-items";
+import { haversineDistanceMeters } from "@/lib/distance";
 import {
   getRouteEndPoint,
   getRouteStartPoint,
