@@ -115,7 +115,7 @@ export default function CoverageProofModal({
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        padding: 16,
+        padding: "max(12px, calc(env(safe-area-inset-top) + 8px)) 16px max(12px, calc(env(safe-area-inset-bottom) + 8px))",
         background: "rgba(8, 10, 8, 0.56)",
         backdropFilter: "blur(10px)",
       }}
@@ -123,6 +123,7 @@ export default function CoverageProofModal({
       <div
         style={{
           width: "min(100%, 540px)",
+          maxHeight: "calc(100dvh - 24px)",
           borderRadius: 24,
           border: "1px solid rgba(74, 222, 128, 0.18)",
           background:
@@ -130,6 +131,8 @@ export default function CoverageProofModal({
           boxShadow: "0 28px 60px rgba(0, 0, 0, 0.36)",
           color: "#effff3",
           overflow: "hidden",
+          display: "flex",
+          flexDirection: "column",
         }}
       >
         <div
@@ -182,11 +185,20 @@ export default function CoverageProofModal({
               opacity: isSubmitting ? 0.55 : 1,
             }}
           >
-            ×
+            &times;
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} style={{ padding: 22, display: "grid", gap: 16 }}>
+        <form
+          onSubmit={handleSubmit}
+          style={{
+            padding: 22,
+            display: "grid",
+            gap: 16,
+            overflowY: "auto",
+            WebkitOverflowScrolling: "touch",
+          }}
+        >
           <div
             style={{
               borderRadius: 18,

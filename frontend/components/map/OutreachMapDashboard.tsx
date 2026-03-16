@@ -904,6 +904,8 @@ export default function OutreachMapDashboard() {
     window.open(`https://www.google.com/maps/search/?${params.toString()}`, "_blank", "noopener,noreferrer");
   }
 
+  const mobileFloatingBottom = "max(88px, calc(env(safe-area-inset-bottom) + 18px))";
+
   if (isTrackerMode) {
     return (
       <TrackerSessionExperience
@@ -1383,7 +1385,7 @@ export default function OutreachMapDashboard() {
                   lineHeight: 1,
                 }}
               >
-                ×
+                &times;
               </button>
             </div>
 
@@ -1496,11 +1498,9 @@ export default function OutreachMapDashboard() {
       <div
         style={{
           position: "absolute",
-          left: isMobile ? "auto" : "50%",
-          right: isMobile ? 12 : "auto",
-          top: isMobile ? "50%" : "auto",
-          bottom: isMobile ? "auto" : 18,
-          transform: isMobile ? "translateY(-50%)" : "translateX(-50%)",
+          left: "50%",
+          bottom: isMobile ? mobileFloatingBottom : 18,
+          transform: "translateX(-50%)",
           zIndex: 500,
         }}
       >
@@ -1510,32 +1510,26 @@ export default function OutreachMapDashboard() {
           disabled={isLoadingRouteItems}
           style={{
             display: "flex",
-            flexDirection: isMobile ? "column" : "row",
+            flexDirection: "row",
             alignItems: "center",
             justifyContent: "center",
-            gap: isMobile ? 2 : 0,
-            width: isMobile ? 54 : "auto",
-            minHeight: isMobile ? 110 : "auto",
-            borderRadius: isMobile ? 18 : 999,
-            padding: isMobile ? "12px 10px" : "13px 18px",
+            gap: 0,
+            width: "auto",
+            minHeight: isMobile ? 50 : "auto",
+            minWidth: isMobile ? 154 : 0,
+            borderRadius: 999,
+            padding: isMobile ? "12px 20px" : "13px 18px",
             background: "linear-gradient(135deg, #1a1000 0%, #3a2700 100%)",
             border: "1px solid rgba(245,200,66,0.24)",
             color: "#fff7de",
             boxShadow: "0 16px 34px rgba(26,16,0,0.28)",
-            fontSize: isMobile ? 11 : 12.5,
+            fontSize: isMobile ? 12 : 12.5,
             fontWeight: 800,
             lineHeight: 1.1,
             opacity: isLoadingRouteItems ? 0.7 : 1,
           }}
         >
-          {isMobile ? (
-            <>
-              <span>{isLoadingRouteItems ? "Loading" : "Route"}</span>
-              <span>Tracker</span>
-            </>
-          ) : (
-            isLoadingRouteItems ? "Loading route..." : "Route Tracker"
-          )}
+          {isLoadingRouteItems ? "Loading route..." : "Route Tracker"}
         </button>
       </div>
 
@@ -1544,7 +1538,7 @@ export default function OutreachMapDashboard() {
           style={{
             position: "absolute",
             left: 18,
-            bottom: 18,
+            bottom: isMobile ? mobileFloatingBottom : 18,
             zIndex: 500,
             pointerEvents: "none",
           }}

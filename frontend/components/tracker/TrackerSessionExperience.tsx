@@ -334,6 +334,8 @@ export default function TrackerSessionExperience({
     setStatusMessage(`Added ${type.replaceAll("_", " ")} stop.`);
   }
 
+  const mobileFloatingBottom = "max(88px, calc(env(safe-area-inset-bottom) + 18px))";
+
   return (
     <div
       style={{
@@ -353,58 +355,81 @@ export default function TrackerSessionExperience({
         height="100%"
         onSnapshotReady={handleSnapshotReady}
         overlay={
-          <>
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
-              <div
-                style={{
-                  maxWidth: "72%",
-                  padding: "12px 14px",
-                  borderRadius: 18,
-                  background: "rgba(26,18,0,0.72)",
-                  color: "#fff8e8",
-                  backdropFilter: "blur(14px)",
-                  pointerEvents: "auto",
-                }}
-              >
-                <p
-                  style={{
-                    margin: 0,
-                    fontSize: 12,
-                    fontWeight: 700,
-                    letterSpacing: "0.1em",
-                    textTransform: "uppercase",
-                    color: "rgba(245,200,66,0.76)",
-                  }}
-                >
-                  Route Tracker
-                </p>
-                <p
-                  style={{
-                    margin: "4px 0 0",
-                    fontSize: 20,
-                    fontWeight: 700,
-                    lineHeight: 1.2,
-                  }}
-                >
-                  {statusMessage}
-                </p>
-              </div>
-              <div style={{ display: "flex", gap: 10, pointerEvents: "auto" }}>
+          isMobile ? (
+            <>
+              <div style={{ display: "grid", gap: 8 }}>
+                <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                  <div
+                    style={{
+                      flex: 1,
+                      minWidth: 0,
+                      padding: "10px 12px",
+                      borderRadius: 16,
+                      background: "rgba(26,18,0,0.72)",
+                      color: "#fff8e8",
+                      backdropFilter: "blur(14px)",
+                      pointerEvents: "auto",
+                    }}
+                  >
+                    <p
+                      style={{
+                        margin: 0,
+                        fontSize: 11,
+                        fontWeight: 700,
+                        letterSpacing: "0.1em",
+                        textTransform: "uppercase",
+                        color: "rgba(245,200,66,0.76)",
+                      }}
+                    >
+                      Route Tracker
+                    </p>
+                    <p
+                      style={{
+                        margin: "4px 0 0",
+                        fontSize: 16,
+                        fontWeight: 700,
+                        lineHeight: 1.15,
+                      }}
+                    >
+                      {statusMessage}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={onExit}
+                    style={{
+                      alignSelf: "flex-start",
+                      borderRadius: 16,
+                      padding: "11px 12px",
+                      background: "rgba(26,18,0,0.72)",
+                      color: "#fff8e8",
+                      border: "1px solid rgba(245,200,66,0.16)",
+                      backdropFilter: "blur(14px)",
+                      fontSize: 11.5,
+                      fontWeight: 800,
+                    }}
+                  >
+                    Back
+                  </button>
+                </div>
                 <div
                   style={{
+                    display: "inline-flex",
                     alignSelf: "flex-start",
-                    padding: "10px 12px",
-                    borderRadius: 18,
+                    padding: "8px 10px",
+                    borderRadius: 14,
                     background: "rgba(255,248,232,0.14)",
                     color: "#fff1c7",
                     backdropFilter: "blur(12px)",
-                    textAlign: "right",
+                    pointerEvents: "auto",
+                    gap: 8,
+                    alignItems: "baseline",
                   }}
                 >
                   <p
                     style={{
                       margin: 0,
-                      fontSize: 11,
+                      fontSize: 10.5,
                       fontWeight: 700,
                       letterSpacing: "0.08em",
                       textTransform: "uppercase",
@@ -413,59 +438,165 @@ export default function TrackerSessionExperience({
                   >
                     Planned
                   </p>
-                  <p style={{ margin: "3px 0 0", fontSize: 18, fontWeight: 700 }}>
+                  <p style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>
                     {plannedItems.length}
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={onExit}
+              </div>
+              <div
+                style={{
+                  display: "grid",
+                  gap: 8,
+                  justifyItems: "center",
+                  marginBottom: 72,
+                }}
+              >
+                <div
                   style={{
-                    alignSelf: "flex-start",
-                    borderRadius: 999,
-                    padding: "10px 14px",
-                    background: "rgba(26,18,0,0.72)",
-                    color: "#fff8e8",
-                    border: "1px solid rgba(245,200,66,0.16)",
-                    backdropFilter: "blur(14px)",
-                    fontSize: 12,
-                    fontWeight: 800,
+                    display: "grid",
+                    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+                    gap: 8,
+                    width: "min(100%, 290px)",
+                    pointerEvents: "auto",
                   }}
                 >
-                  Back to Map
-                </button>
+                  <OverlayPill label="Points" value={String(liveStats.points)} compact />
+                  <OverlayPill label="Stops" value={String(liveStats.stops)} compact />
+                  <OverlayPill label="Time" value={liveStats.duration} compact />
+                  <OverlayPill label="Distance" value={liveStats.distance} compact />
+                </div>
+                <div
+                  style={{
+                    padding: "9px 12px",
+                    borderRadius: 999,
+                    background: "rgba(26,18,0,0.74)",
+                    color: "#fff8e8",
+                    fontSize: 11.5,
+                    fontWeight: 700,
+                    backdropFilter: "blur(12px)",
+                    pointerEvents: "auto",
+                    textAlign: "center",
+                  }}
+                >
+                  {isTracking ? "Route is updating" : "Planned markers only until you start"}
+                </div>
               </div>
-            </div>
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-end" }}>
-              <div
-                style={{
-                  display: "flex",
-                  gap: 8,
-                  flexWrap: "wrap",
-                  pointerEvents: "auto",
-                }}
-              >
-                <OverlayPill label="Points" value={String(liveStats.points)} />
-                <OverlayPill label="Stops" value={String(liveStats.stops)} />
-                <OverlayPill label="Time" value={liveStats.duration} />
-                <OverlayPill label="Distance" value={liveStats.distance} />
+            </>
+          ) : (
+            <>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                <div
+                  style={{
+                    maxWidth: "72%",
+                    padding: "12px 14px",
+                    borderRadius: 18,
+                    background: "rgba(26,18,0,0.72)",
+                    color: "#fff8e8",
+                    backdropFilter: "blur(14px)",
+                    pointerEvents: "auto",
+                  }}
+                >
+                  <p
+                    style={{
+                      margin: 0,
+                      fontSize: 12,
+                      fontWeight: 700,
+                      letterSpacing: "0.1em",
+                      textTransform: "uppercase",
+                      color: "rgba(245,200,66,0.76)",
+                    }}
+                  >
+                    Route Tracker
+                  </p>
+                  <p
+                    style={{
+                      margin: "4px 0 0",
+                      fontSize: 20,
+                      fontWeight: 700,
+                      lineHeight: 1.2,
+                    }}
+                  >
+                    {statusMessage}
+                  </p>
+                </div>
+                <div style={{ display: "flex", gap: 10, pointerEvents: "auto" }}>
+                  <div
+                    style={{
+                      alignSelf: "flex-start",
+                      padding: "10px 12px",
+                      borderRadius: 18,
+                      background: "rgba(255,248,232,0.14)",
+                      color: "#fff1c7",
+                      backdropFilter: "blur(12px)",
+                      textAlign: "right",
+                    }}
+                  >
+                    <p
+                      style={{
+                        margin: 0,
+                        fontSize: 11,
+                        fontWeight: 700,
+                        letterSpacing: "0.08em",
+                        textTransform: "uppercase",
+                        color: "rgba(245,200,66,0.72)",
+                      }}
+                    >
+                      Planned
+                    </p>
+                    <p style={{ margin: "3px 0 0", fontSize: 18, fontWeight: 700 }}>
+                      {plannedItems.length}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={onExit}
+                    style={{
+                      alignSelf: "flex-start",
+                      borderRadius: 999,
+                      padding: "10px 14px",
+                      background: "rgba(26,18,0,0.72)",
+                      color: "#fff8e8",
+                      border: "1px solid rgba(245,200,66,0.16)",
+                      backdropFilter: "blur(14px)",
+                      fontSize: 12,
+                      fontWeight: 800,
+                    }}
+                  >
+                    Back to Map
+                  </button>
+                </div>
               </div>
-              <div
-                style={{
-                  padding: "10px 14px",
-                  borderRadius: 999,
-                  background: "rgba(26,18,0,0.74)",
-                  color: "#fff8e8",
-                  fontSize: 12.5,
-                  fontWeight: 700,
-                  backdropFilter: "blur(12px)",
-                  pointerEvents: "auto",
-                }}
-              >
-                {isTracking ? "Route is updating" : "Planned markers only until you start"}
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-end" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 8,
+                    flexWrap: "wrap",
+                    pointerEvents: "auto",
+                  }}
+                >
+                  <OverlayPill label="Points" value={String(liveStats.points)} />
+                  <OverlayPill label="Stops" value={String(liveStats.stops)} />
+                  <OverlayPill label="Time" value={liveStats.duration} />
+                  <OverlayPill label="Distance" value={liveStats.distance} />
+                </div>
+                <div
+                  style={{
+                    padding: "10px 14px",
+                    borderRadius: 999,
+                    background: "rgba(26,18,0,0.74)",
+                    color: "#fff8e8",
+                    fontSize: 12.5,
+                    fontWeight: 700,
+                    backdropFilter: "blur(12px)",
+                    pointerEvents: "auto",
+                  }}
+                >
+                  {isTracking ? "Route is updating" : "Planned markers only until you start"}
+                </div>
               </div>
-            </div>
-          </>
+            </>
+          )
         }
       />
 
@@ -516,7 +647,7 @@ export default function TrackerSessionExperience({
                   lineHeight: 1,
                 }}
               >
-                ×
+                &times;
               </button>
             </div>
 
@@ -605,21 +736,22 @@ export default function TrackerSessionExperience({
         <div
           style={{
             position: "absolute",
-            right: 12,
-            top: "50%",
-            transform: "translateY(-50%)",
+            left: "50%",
+            bottom: mobileFloatingBottom,
+            transform: "translateX(-50%)",
             zIndex: 500,
-            display: "flex",
-            alignItems: "center",
+            display: "grid",
             gap: 10,
+            justifyItems: "center",
             pointerEvents: "none",
+            width: "calc(100% - 24px)",
           }}
         >
           {isMobileControlsOpen ? (
             <div
               style={{
-                width: "min(320px, calc(100vw - 78px))",
-                maxHeight: "78dvh",
+                width: "min(360px, 100%)",
+                maxHeight: "min(56dvh, 520px)",
                 overflowY: "auto",
                 pointerEvents: "auto",
                 borderRadius: 24,
@@ -659,26 +791,25 @@ export default function TrackerSessionExperience({
             onClick={() => setIsMobileControlsOpen((current) => !current)}
             style={{
               pointerEvents: "auto",
-              width: 54,
-              minHeight: 110,
-              borderRadius: 18,
-              padding: "12px 10px",
+              minWidth: 156,
+              minHeight: 52,
+              borderRadius: 999,
+              padding: "12px 20px",
               background: "linear-gradient(135deg, rgba(26,18,0,0.92) 0%, rgba(58,39,0,0.96) 100%)",
               border: "1px solid rgba(245,200,66,0.24)",
               color: "#fff7de",
               boxShadow: "0 16px 34px rgba(26,16,0,0.22)",
               display: "flex",
-              flexDirection: "column",
+              flexDirection: "row",
               alignItems: "center",
               justifyContent: "center",
-              gap: 4,
-              fontSize: 11,
+              gap: 8,
+              fontSize: 12,
               fontWeight: 800,
               lineHeight: 1.1,
             }}
           >
-            <span>{isMobileControlsOpen ? "Close" : "Route"}</span>
-            <span>{isMobileControlsOpen ? "Panel" : "Tools"}</span>
+            {isMobileControlsOpen ? "Close Route Tools" : "Open Route Tools"}
           </button>
         </div>
       ) : (
@@ -730,22 +861,30 @@ export default function TrackerSessionExperience({
   );
 }
 
-function OverlayPill({ label, value }: { label: string; value: string }) {
+function OverlayPill({
+  label,
+  value,
+  compact = false,
+}: {
+  label: string;
+  value: string;
+  compact?: boolean;
+}) {
   return (
     <div
       style={{
-        padding: "10px 12px",
-        borderRadius: 18,
+        padding: compact ? "9px 10px" : "10px 12px",
+        borderRadius: compact ? 16 : 18,
         background: "rgba(255,248,232,0.16)",
         color: "#fff8e8",
         backdropFilter: "blur(12px)",
-        minWidth: 82,
+        minWidth: compact ? 0 : 82,
       }}
     >
       <p
         style={{
           margin: 0,
-          fontSize: 11,
+          fontSize: compact ? 10 : 11,
           fontWeight: 700,
           letterSpacing: "0.08em",
           textTransform: "uppercase",
@@ -754,7 +893,7 @@ function OverlayPill({ label, value }: { label: string; value: string }) {
       >
         {label}
       </p>
-      <p style={{ margin: "4px 0 0", fontSize: 16, fontWeight: 700 }}>{value}</p>
+      <p style={{ margin: "4px 0 0", fontSize: compact ? 14 : 16, fontWeight: 700 }}>{value}</p>
     </div>
   );
 }
