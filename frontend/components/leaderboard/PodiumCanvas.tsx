@@ -70,9 +70,12 @@ export default function PodiumCanvas({ podiumData }: { podiumData: PodiumEntry[]
 
         const width = el.clientWidth;
         const height = el.clientHeight || 360;
+        const aspect = width / height;
         const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(42, width / height, 0.1, 100);
-        camera.position.set(0, 3.2, 9);
+        const fov = aspect < 1 ? 52 : aspect < 1.3 ? 46 : 42;
+        const camZ = aspect < 1 ? 9.5 : aspect < 1.3 ? 9.2 : 9;
+        const camera = new THREE.PerspectiveCamera(fov, aspect, 0.1, 100);
+        camera.position.set(0, 3.2, camZ);
         camera.lookAt(0, 0.5, 0);
 
         renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -276,7 +279,10 @@ export default function PodiumCanvas({ podiumData }: { podiumData: PodiumEntry[]
         onResize = () => {
           const nextWidth = el.clientWidth;
           const nextHeight = el.clientHeight || 360;
-          camera.aspect = nextWidth / nextHeight;
+          const nextAspect = nextWidth / nextHeight;
+          camera.aspect = nextAspect;
+          camera.fov = nextAspect < 1 ? 52 : nextAspect < 1.3 ? 46 : 42;
+          camera.position.z = nextAspect < 1 ? 9.5 : nextAspect < 1.3 ? 9.2 : 9;
           camera.updateProjectionMatrix();
           renderer.setSize(nextWidth, nextHeight);
         };

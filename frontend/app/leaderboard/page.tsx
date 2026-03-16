@@ -148,7 +148,13 @@ export default function LeaderboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [period, setPeriod] = useState<"all" | "month" | "week">("all");
+  const [visibleMetrics, setVisibleMetrics] = useState({
+    flyers: true,
+    scans: true,
+    hours: true,
+  });
   const [totalVolunteers, setTotalVolunteers] = useState(0);
+  const [totalFlyersAll, setTotalFlyersAll] = useState(0);
   const [totalScansAll, setTotalScansAll] = useState(0);
   const [totalHoursAll, setTotalHoursAll] = useState(0);
 
@@ -157,12 +163,14 @@ export default function LeaderboardPage() {
 
     async function load() {
       try {
+        setLoading(true);
         setError(null);
-        const response = await getLeaderboard(period);
+        const response = await getLeaderboard(period, visibleMetrics);
         if (!cancelled) {
           setEntries(response.data);
           setPodiumEntries(response.podium ?? []);
           setTotalVolunteers(response.totalVolunteers ?? 0);
+          setTotalFlyersAll(response.totalFlyers ?? 0);
           setTotalScansAll(response.totalScans ?? 0);
           setTotalHoursAll(response.totalHours ?? 0);
         }
@@ -182,7 +190,7 @@ export default function LeaderboardPage() {
     return () => {
       cancelled = true;
     };
-  }, [period]);
+  }, [period, visibleMetrics]);
 
   const displayRows = useMemo<DisplayRow[]>(() => {
     if (!entries.length) {
@@ -207,6 +215,29 @@ export default function LeaderboardPage() {
     });
   }, [entries, user?.id]);
 
+  const selectedMetricKeys = (["flyers", "scans", "hours"] as const).filter((key) => visibleMetrics[key]);
+  const primaryMetric = selectedMetricKeys[0] ?? "flyers";
+  const metricLabelLower =
+    selectedMetricKeys.length === 1
+      ? primaryMetric
+      : selectedMetricKeys.length === 3
+        ? "selected metrics"
+        : selectedMetricKeys.join(" + ");
+
+  const metricValueForEntry = (entry: LeaderboardEntry | DisplayRow | null | undefined) => {
+    if (!entry) return 0;
+    if (primaryMetric === "hours") return entry.hours ?? entry.total_duration_seconds / 3600;
+    if (primaryMetric === "scans") return entry.scans ?? 0;
+    return entry.flyers ?? 0;
+  };
+
+  const formatMetricValue = (value: number) => {
+    if (primaryMetric === "hours") {
+      return value >= 10 ? `${Math.round(value)}h` : `${value.toFixed(1)}h`;
+    }
+    return value.toLocaleString();
+  };
+
   const podiumRows = useMemo(() => {
     return podiumSlots
       .map((slot) => {
@@ -215,7 +246,12 @@ export default function LeaderboardPage() {
         return {
           name: p.username,
           avatar: getInitials(p.username),
-          flyers: p.flyers ?? 0,
+          flyers:
+            primaryMetric === "hours"
+              ? p.hours ?? p.total_duration_seconds / 3600
+              : primaryMetric === "scans"
+                ? p.scans ?? 0
+                : p.flyers ?? 0,
           color: rankColors[slot.rank] ?? "#f5c842",
           height: slot.height,
           rank: slot.rank,
@@ -224,7 +260,7 @@ export default function LeaderboardPage() {
         };
       })
       .filter((entry): entry is PodiumRow => entry !== null);
-  }, [podiumEntries]);
+  }, [podiumEntries, primaryMetric]);
 
   const yourStanding = useMemo(
     () => displayRows.find((entry) => entry.isYou) ?? null,
@@ -240,18 +276,28 @@ export default function LeaderboardPage() {
 
   const computedStats = useMemo(() => {
     return [
-      { label: "Total Scans", value: totalScansAll.toLocaleString(), icon: "SC" },
+      { label: "Flyers Uploaded", value: totalFlyersAll.toLocaleString(), icon: "FL" },
+      { label: "QR Scans", value: totalScansAll.toLocaleString(), icon: "SC" },
       { label: "Active Volunteers", value: totalVolunteers.toLocaleString(), icon: "AV" },
-      { label: "Locations Covered", value: "12", icon: "LC" },
       { label: "Total Hours", value: String(totalHoursAll), icon: "HR" },
     ];
-  }, [totalScansAll, totalVolunteers, totalHoursAll]);
+  }, [totalFlyersAll, totalScansAll, totalVolunteers, totalHoursAll]);
 
   const personAhead = yourIndex > 0 ? displayRows[yourIndex - 1] : null;
-  const yourScans = yourStanding?.flyers ?? 0;
-  const aheadScans = personAhead?.flyers ?? yourScans;
+  const yourFlyers = metricValueForEntry(yourStanding);
+  const aheadFlyers = personAhead ? metricValueForEntry(personAhead) : yourFlyers;
   const progressToNext =
-    personAhead && aheadScans > 0 ? Math.min(100, (yourScans / aheadScans) * 100) : 100;
+    personAhead && aheadFlyers > 0 ? Math.min(100, (yourFlyers / aheadFlyers) * 100) : 100;
+
+  const toggleMetricVisibility = (key: "flyers" | "scans" | "hours") => {
+    if (selectedMetricKeys.length === 1 && visibleMetrics[key]) {
+      return;
+    }
+    setVisibleMetrics((current) => ({
+      ...current,
+      [key]: !current[key],
+    }));
+  };
 
   if (user?.isGuest) {
     return (
@@ -311,7 +357,7 @@ export default function LeaderboardPage() {
                   Champions Podium
                 </h3>
                 <p style={{ fontSize: 12, color: "rgba(245,200,66,0.45)", marginTop: 2 }}>
-                  {periodLabel} &middot; Ranked by scans
+                  {periodLabel} &middot; Ranked by {metricLabelLower}
                 </p>
               </div>
             </div>
@@ -381,7 +427,7 @@ export default function LeaderboardPage() {
                   #{row.rank} | {row.name}
                 </p>
                 <p style={{ fontSize: 10.5, color: "rgba(245,200,66,0.4)" }}>
-                  {formatHours((podiumEntries[row.rank - 1]?.total_duration_seconds ?? 0))}
+                  {formatMetricValue(metricValueForEntry(podiumEntries[row.rank - 1]))}
                 </p>
               </div>
             ))}
@@ -416,11 +462,11 @@ export default function LeaderboardPage() {
                 <div style={{ marginTop: 4 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
                     <span style={{ fontSize: 11, color: "rgba(245,200,66,0.5)" }}>
-                      You | {yourScans.toLocaleString()} scans
+                      You | {formatMetricValue(yourFlyers)} {metricLabelLower}
                     </span>
                     <span style={{ fontSize: 11, color: "rgba(245,200,66,0.5)" }}>
                       {personAhead
-                        ? `${personAhead.username} | ${aheadScans.toLocaleString()} scans`
+                        ? `${personAhead.username} | ${formatMetricValue(aheadFlyers)} ${metricLabelLower}`
                         : "Top position"}
                     </span>
                   </div>
@@ -451,7 +497,7 @@ export default function LeaderboardPage() {
                     }}
                   >
                     {personAhead
-                      ? `${Math.max(0, aheadScans - yourScans).toLocaleString()} more scans to move up`
+                      ? `${formatMetricValue(Math.max(0, aheadFlyers - yourFlyers))} more ${metricLabelLower} to move up`
                       : "You are leading the board"}
                   </p>
                 </div>
@@ -526,7 +572,7 @@ export default function LeaderboardPage() {
 
       <SectionCard
         title="Full Rankings"
-        subtitle={`Top ${displayRows.length || 0} volunteers | ranked by scans`}
+        subtitle={`Top ${displayRows.length || 0} volunteers | ranked by ${metricLabelLower}`}
         action={
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
             {([["All Time", "all"], ["This Month", "month"], ["This Week", "week"]] as const).map(([label, value]) => {
@@ -562,26 +608,73 @@ export default function LeaderboardPage() {
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "44px minmax(180px, 1fr) 90px 70px",
+                gridTemplateColumns: "44px minmax(180px, 1fr) 90px 90px 70px",
                 gap: 12,
                 padding: "0 10px 10px",
                 borderBottom: "1px solid rgba(190,155,70,0.15)",
-                minWidth: 400,
+                minWidth: 500,
               }}
             >
-              {["#", "Volunteer", "Scans", "Hours"].map((heading) => (
-                <span
-                  key={heading}
+              <span
+                style={{
+                  fontSize: 10.5,
+                  fontWeight: 600,
+                  color: "#9a8a60",
+                  letterSpacing: "0.06em",
+                  textTransform: "uppercase",
+                }}
+              >
+                #
+              </span>
+              <span
+                style={{
+                  fontSize: 10.5,
+                  fontWeight: 600,
+                  color: "#9a8a60",
+                  letterSpacing: "0.06em",
+                  textTransform: "uppercase",
+                }}
+              >
+                Volunteer
+              </span>
+              {([
+                ["Flyers", "flyers"],
+                ["Scans", "scans"],
+                ["Hours", "hours"],
+              ] as const).map(([heading, key]) => (
+                <label
+                  key={key}
                   style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 8,
                     fontSize: 10.5,
                     fontWeight: 600,
                     color: "#9a8a60",
                     letterSpacing: "0.06em",
                     textTransform: "uppercase",
+                    cursor: "pointer",
+                    userSelect: "none",
                   }}
                 >
+                  <input
+                    type="checkbox"
+                    checked={visibleMetrics[key]}
+                    onChange={() => toggleMetricVisibility(key)}
+                    style={{
+                      appearance: "none",
+                      width: 16,
+                      height: 16,
+                      borderRadius: 5,
+                      border: `1.5px solid ${visibleMetrics[key] ? "#7c3aed" : "rgba(190,155,70,0.28)"}`,
+                      background: visibleMetrics[key] ? "linear-gradient(135deg, #f3e8ff, #ede9fe)" : "#fffdf8",
+                      boxShadow: visibleMetrics[key] ? "inset 0 0 0 4px #7c3aed" : "none",
+                      margin: 0,
+                      cursor: "pointer",
+                    }}
+                  />
                   {heading}
-                </span>
+                </label>
               ))}
             </div>
             {displayRows.map((volunteer, index) => (
@@ -613,7 +706,7 @@ export default function LeaderboardPage() {
                 style={{
                   animationDelay: `${0.3 + index * 0.06}s`,
                   display: "grid",
-                  gridTemplateColumns: "44px minmax(180px, 1fr) 90px 70px",
+                  gridTemplateColumns: "44px minmax(180px, 1fr) 90px 90px 70px",
                   gap: 12,
                   alignItems: "center",
                   padding: "10px 10px",
@@ -628,7 +721,7 @@ export default function LeaderboardPage() {
                   border: rowBorder,
                   boxShadow: topThreeBackground ? `0 10px 24px ${rankColors[volunteer.rank]}18` : "none",
                   marginBottom: 3,
-                  minWidth: 400,
+                  minWidth: 500,
                 }}
               >
                 <div style={{ textAlign: "center" }}>
@@ -730,14 +823,35 @@ export default function LeaderboardPage() {
                   style={{
                     fontSize: 14,
                     fontWeight: 700,
-                    color: "#1a1600",
+                    color: visibleMetrics.flyers ? "#1a1600" : "#8a7a50",
                     fontFamily: "'Fraunces', Georgia, serif",
+                    opacity: visibleMetrics.flyers ? 1 : 0.62,
                   }}
                 >
                   {volunteer.flyers.toLocaleString()}
                 </span>
 
-                <span style={{ fontSize: 13, color: "#5a4a20" }}>{volunteer.hoursLabel}</span>
+                <span
+                  style={{
+                    fontSize: 14,
+                    fontWeight: 700,
+                    color: visibleMetrics.scans ? "#7c3aed" : "#8a7a50",
+                    fontFamily: "'Fraunces', Georgia, serif",
+                    opacity: visibleMetrics.scans ? 1 : 0.62,
+                  }}
+                >
+                  {volunteer.scans.toLocaleString()}
+                </span>
+
+                <span
+                  style={{
+                    fontSize: 13,
+                    color: visibleMetrics.hours ? "#5a4a20" : "#8a7a50",
+                    opacity: visibleMetrics.hours ? 1 : 0.62,
+                  }}
+                >
+                  {volunteer.hoursLabel}
+                </span>
               </div>
                 );
               })()

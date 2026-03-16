@@ -6,13 +6,15 @@ async function getBadges(req, res) {
 
     let flyers = 0;
     let hours = 0;
+    let scans = 0;
     const statsRow = await pool.query(
-      "SELECT flyers, hours FROM user_stats WHERE id = $1",
+      "SELECT flyers, hours, scans FROM user_stats WHERE id = $1",
       [userId]
     );
     if (statsRow.rows[0]) {
       flyers = Number(statsRow.rows[0].flyers || 0);
       hours = Number(statsRow.rows[0].hours ?? 0);
+      scans = Number(statsRow.rows[0].scans ?? 0);
     } else {
       const fallback = await pool.query(
         "SELECT COALESCE(SUM(jsonb_array_length(stops_json)), 0) AS total FROM route_sessions WHERE user_id = $1",
@@ -88,6 +90,7 @@ async function getBadges(req, res) {
         top_5: top5,
         top_1: top1,
         flyers,
+        scans,
         hours,
         rank,
         streak_days: streakDays,

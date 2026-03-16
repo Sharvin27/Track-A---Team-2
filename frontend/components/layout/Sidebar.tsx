@@ -49,18 +49,6 @@ const NAV: NavItem[] = [
     ),
   },
   {
-    href: "/tracker",
-    label: "Route Tracker",
-    icon: (
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M3 6h6l2 12h10" />
-        <circle cx="7" cy="6" r="2" />
-        <circle cx="17" cy="18" r="2" />
-        <path d="M9 9l3 3 4-5" />
-      </svg>
-    ),
-  },
-  {
     href: "/profile",
     label: "Profile",
     icon: (
@@ -128,7 +116,7 @@ export default function Sidebar({ isMobile, isOpen, onClose }: SidebarProps) {
         position: isMobile ? "fixed" : "relative",
         top: 0,
         left: 0,
-        zIndex: 50,
+        zIndex: 1000,
         overflow: "hidden",
         transform: isMobile ? `translateX(${isOpen ? "0" : "-100%"})` : "translateX(0)",
         transition: "transform 0.25s ease",

@@ -6,10 +6,53 @@ function getDateFilter(period) {
   return null;
 }
 
+function isEnabled(value, fallback = true) {
+  if (value === undefined) return fallback;
+  return value === "true" || value === "1";
+}
+
+function getEnabledMetrics(query) {
+  const enabled = {
+    flyers: isEnabled(query.includeFlyers, true),
+    scans: isEnabled(query.includeScans, true),
+    hours: isEnabled(query.includeHours, true),
+  };
+
+  if (!enabled.flyers && !enabled.scans && !enabled.hours) {
+    return { flyers: true, scans: true, hours: true };
+  }
+
+  return enabled;
+}
+
+function getOrderClause(enabledMetrics) {
+  const clauses = [];
+
+  if (enabledMetrics.flyers) clauses.push("flyers DESC");
+  if (enabledMetrics.scans) clauses.push("scans DESC");
+  if (enabledMetrics.hours) clauses.push("hours DESC");
+
+  clauses.push("username ASC");
+  return clauses.join(", ");
+}
+
+function getActivityWhereClause(enabledMetrics) {
+  const clauses = [];
+
+  if (enabledMetrics.flyers) clauses.push("flyers > 0");
+  if (enabledMetrics.scans) clauses.push("scans > 0");
+  if (enabledMetrics.hours) clauses.push("hours > 0");
+
+  return clauses.length ? clauses.join(" OR ") : "TRUE";
+}
+
 async function getLeaderboard(req, res) {
   try {
     const period = req.query.period || "all";
     const dateFilter = getDateFilter(period);
+    const enabledMetrics = getEnabledMetrics(req.query);
+    const orderClause = getOrderClause(enabledMetrics);
+    const activityWhereClause = getActivityWhereClause(enabledMetrics);
 
     let result;
 
@@ -26,25 +69,27 @@ async function getLeaderboard(req, res) {
               users.agreed_to_terms,
               profile_photos.image_url AS profile_photo_url,
               COALESCE(SUM(uda.flyers), 0)::BIGINT AS flyers,
+              COALESCE(user_stats.scans, 0)::BIGINT AS scans,
               COALESCE(SUM(uda.hours), 0)::DOUBLE PRECISION AS hours
             FROM users
             LEFT JOIN profile_photos ON profile_photos.user_id = users.id
+            LEFT JOIN user_stats ON user_stats.id = users.id
             LEFT JOIN user_daily_activity uda
               ON uda.user_id = users.id
               AND uda.date >= ${dateFilter}
             GROUP BY users.id, users.username, users.email, users.created_at,
-                     users.agreed_to_terms, profile_photos.image_url
+                     users.agreed_to_terms, profile_photos.image_url, user_stats.scans
           ),
           ranked AS (
             SELECT *,
               DENSE_RANK() OVER (
-                ORDER BY flyers DESC, hours DESC, username ASC
+                ORDER BY ${orderClause}
               ) AS rank_position
             FROM stats
           )
           SELECT *
           FROM ranked
-          WHERE flyers > 0 OR hours > 0
+          WHERE ${activityWhereClause}
           ORDER BY rank_position ASC, username ASC
           `
         );
@@ -68,6 +113,7 @@ async function getLeaderboard(req, res) {
               users.agreed_to_terms,
               profile_photos.image_url AS profile_photo_url,
               COALESCE(user_stats.flyers, 0)::BIGINT AS flyers,
+              COALESCE(user_stats.scans, 0)::BIGINT AS scans,
               COALESCE(user_stats.hours, 0)::DOUBLE PRECISION AS hours
             FROM users
             LEFT JOIN profile_photos ON profile_photos.user_id = users.id
@@ -76,7 +122,7 @@ async function getLeaderboard(req, res) {
           ranked AS (
             SELECT *,
               DENSE_RANK() OVER (
-                ORDER BY flyers DESC, hours DESC, username ASC
+                ORDER BY ${orderClause}
               ) AS rank_position
             FROM stats
           )
@@ -94,7 +140,7 @@ async function getLeaderboard(req, res) {
                 users.id, users.username, users.email, users.created_at,
                 users.agreed_to_terms,
                 profile_photos.image_url AS profile_photo_url,
-                0::BIGINT AS flyers, 0::DOUBLE PRECISION AS hours
+                0::BIGINT AS flyers, 0::BIGINT AS scans, 0::DOUBLE PRECISION AS hours
               FROM users
               LEFT JOIN profile_photos ON profile_photos.user_id = users.id
             ),
@@ -118,6 +164,7 @@ async function getLeaderboard(req, res) {
       agreed_to_terms: row.agreed_to_terms,
       profile_photo_url: row.profile_photo_url,
       flyers: Number(row.flyers ?? 0),
+      scans: Number(row.scans ?? 0),
       hours: Number(row.hours ?? 0),
       total_duration_seconds: Math.round(Number(row.hours ?? 0) * 3600),
       session_count: 0,
@@ -137,6 +184,7 @@ async function getLeaderboard(req, res) {
         agreed_to_terms: row.agreed_to_terms,
         profile_photo_url: row.profile_photo_url,
         flyers: Number(row.flyers ?? 0),
+        scans: Number(row.scans ?? 0),
         hours: Number(row.hours ?? 0),
         total_duration_seconds: Math.round(Number(row.hours ?? 0) * 3600),
         rank: index + 1,
@@ -147,7 +195,8 @@ async function getLeaderboard(req, res) {
     const totalUsersResult = await pool.query(`SELECT COUNT(*)::int AS total FROM users`);
     const totalVolunteers = totalUsersResult.rows[0]?.total ?? 0;
 
-    const totalScans = data.reduce((sum, row) => sum + row.flyers, 0);
+    const totalFlyers = data.reduce((sum, row) => sum + row.flyers, 0);
+    const totalScans = data.reduce((sum, row) => sum + row.scans, 0);
     const totalHours = data.reduce((sum, row) => sum + row.hours, 0);
 
     return res.json({
@@ -155,7 +204,9 @@ async function getLeaderboard(req, res) {
       count: top10.length,
       data: top10,
       podium,
+      enabledMetrics,
       totalVolunteers,
+      totalFlyers,
       totalScans,
       totalHours: Math.round(totalHours * 10) / 10,
     });

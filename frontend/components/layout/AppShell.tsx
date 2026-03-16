@@ -104,7 +104,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             background: "rgba(0,0,0,0.35)",
             backdropFilter: "blur(2px)",
             border: "none",
-            zIndex: 45,
+            zIndex: 999,
           }}
         />
           ) : null}

@@ -61,6 +61,7 @@ const CATEGORY_SCORES = {
   "Convenience Store": 5.8,
   "Variety Store": 5.8,
   "Place of Worship": 5.4,
+  "Custom Proof": 6.4,
 };
 
 const UPSERT_HOTSPOT_SQL = `
@@ -242,6 +243,19 @@ async function updateHotspotStatus(id, updates) {
   );
 
   return normalizeRow(updatedResult.rows[0]);
+}
+
+async function getHotspotById(id) {
+  const result = await query(
+    `
+      SELECT *
+      FROM hotspot_locations
+      WHERE id = $1
+    `,
+    [id],
+  );
+
+  return normalizeRow(result.rows[0]);
 }
 
 function buildOverpassQuery({ lat, lng, radiusMeters }) {
@@ -510,7 +524,9 @@ function getDistanceMiles(fromLat, fromLng, toLat, toLng) {
 }
 
 module.exports = {
+  getHotspotById,
   importHotspotsFromOsm,
   getStoredHotspots,
+  normalizeRow,
   updateHotspotStatus,
 };
