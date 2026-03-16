@@ -74,7 +74,7 @@ async function signup(req, res) {
     );
     const newUserId = result.rows[0].id;
     await query(
-      `INSERT INTO user_stats (id, flyers, hours, "updatedAt") VALUES ($1, 0, 0, NOW())`,
+      `INSERT INTO user_stats (id, flyers, hours, scans, "updatedAt") VALUES ($1, 0, 0, 0, NOW())`,
       [newUserId]
     );
     const user = await fetchUserById(newUserId);
