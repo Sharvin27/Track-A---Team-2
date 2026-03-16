@@ -13,6 +13,10 @@ import {
 } from "@/lib/route-items";
 import { useAuth } from "@/context/AuthContext";
 import type { SavedRouteItem, SavedRouteItemsResponse } from "@/types/route-items";
+import { useRouter } from "next/navigation";
+import { getMeetups, joinMeetup } from "@/lib/meetup-api";
+import { formatDateTimeRange } from "@/lib/social-format";
+import type { MeetupSummary } from "@/lib/social-types";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ||
@@ -107,6 +111,7 @@ type LayerVisibility = {
   covered: boolean;
   regions: boolean;
   printers: boolean;
+  meetups: boolean;
 };
 type PriorityOrigin = {
   lat: number;
@@ -184,18 +189,22 @@ const priorityStyle = {
 const HOTSPOT_REVEAL_ZOOM = 15;
 
 export default function OutreachMapDashboard() {
+  const router = useRouter();
   const { token, isGuest } = useAuth();
   const [locations, setLocations] = useState<MapLocation[]>([]);
   const [printers, setPrinters] = useState<MapPrinter[]>([]);
   const [needRegions, setNeedRegions] = useState<MapNeedRegion[]>([]);
   const [routeItems, setRouteItems] = useState<SavedRouteItem[]>([]);
+  const [meetups, setMeetups] = useState<MeetupSummary[]>([]);
   const [selectedLocationId, setSelectedLocationId] = useState<string | null>(null);
+  const [selectedMeetupId, setSelectedMeetupId] = useState<number | null>(null);
   const [layers, setLayers] = useState<LayerVisibility>({
     recommended: true,
     uncovered: true,
     covered: false,
     regions: true,
     printers: true,
+    meetups: true,
   });
   const [viewport, setViewport] = useState<MapViewportState>({
     zoom: 12,
@@ -274,6 +283,7 @@ export default function OutreachMapDashboard() {
     viewport,
     highlightedRegionCodes,
   );
+  const visibleMeetups = layers.meetups ? getVisibleMeetups(meetups, viewport) : [];
 
   const selectedLocation =
     rankedLocations.find((location) => location.id === selectedLocationId) || null;
@@ -281,10 +291,13 @@ export default function OutreachMapDashboard() {
   const selectedLocationRouteItem = selectedLocation
     ? routeItemByDedupeKey.get(getHotspotRouteDedupeKey(selectedLocation))
     : null;
+  const selectedMeetup =
+    meetups.find((meetup) => Number(meetup.id) === Number(selectedMeetupId)) || null;
 
   const runInitialLoad = useEffectEvent(() => {
     void loadStoredHotspots(true);
     void loadNeedRegions(true);
+    void loadMeetups();
   });
 
   const runLocationSearch = useEffectEvent((query: string) => {
@@ -423,6 +436,17 @@ export default function OutreachMapDashboard() {
       setLocations([]);
     } finally {
       setIsLoading(false);
+    }
+  }
+
+  async function loadMeetups() {
+    try {
+      const response = await getMeetups(token, false);
+      setMeetups(response.data ?? []);
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Failed to load meetups",
+      );
     }
   }
 
@@ -727,6 +751,27 @@ export default function OutreachMapDashboard() {
     }
   }
 
+  async function handleMeetupJoin(meetupId: number) {
+    if (!token || isGuest) {
+      return;
+    }
+
+    try {
+      const response = await joinMeetup(token, meetupId);
+      setMeetups((current) =>
+        current.map((meetup) =>
+          meetup.id === response.data.id ? response.data : meetup,
+        ),
+      );
+      setSelectedMeetupId(response.data.id);
+      router.push(`/community/meetups/${response.data.id}`);
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Failed to join meetup",
+      );
+    }
+  }
+
   function openGoogleMapsLocation(location: RankedLocation) {
     const params = new URLSearchParams({
       q: `${location.name} ${location.address}`.trim(),
@@ -759,15 +804,27 @@ export default function OutreachMapDashboard() {
     >
       <OutreachMapCanvas
         locations={visibleLocations}
+        meetups={visibleMeetups}
         printers={layers.printers ? printers : []}
         highlightedRegions={layers.regions ? highlightedRegions : []}
         recommendedLocationIds={recommendedLocationIds}
         routeItemDedupeKeys={new Set(routeItems.map((item) => item.dedupeKey))}
         selectedLocation={selectedLocation}
+        selectedMeetup={selectedMeetup}
         focusRequest={focusRequest}
-        onSelect={setSelectedLocationId}
+        onSelect={(locationId) => {
+          setSelectedLocationId(locationId);
+          setSelectedMeetupId(null);
+        }}
+        onSelectMeetup={(meetupId) => {
+          setSelectedMeetupId(meetupId);
+          setSelectedLocationId(null);
+        }}
         onTogglePrinterRoute={handleTogglePrinterRoute}
-        onMapClick={() => setSelectedLocationId(null)}
+        onMapClick={() => {
+          setSelectedLocationId(null);
+          setSelectedMeetupId(null);
+        }}
         onViewportChange={handleViewportChange}
       />
 
@@ -817,6 +874,7 @@ export default function OutreachMapDashboard() {
                   ["covered", "Covered"],
                   ["printers", "Printers"],
                   ["regions", "High-need regions"],
+                  ["meetups", "Meetups"],
                 ].map(([key, label]) => {
                   const layerKey = key as keyof LayerVisibility;
                   const active = layers[layerKey];
@@ -994,6 +1052,19 @@ export default function OutreachMapDashboard() {
                     />
                   }
                 />
+                <LegendItem
+                  label="Meetup"
+                  icon={
+                    <span
+                      className="meetup-marker-ring"
+                      style={{
+                        width: 18,
+                        height: 18,
+                        display: "inline-block",
+                      }}
+                    />
+                  }
+                />
               </div>
             ),
           },
@@ -1030,7 +1101,119 @@ export default function OutreachMapDashboard() {
         ))}
       </div>
 
-      {selectedLocation && (
+      {selectedMeetup ? (
+        <div
+          style={{
+            position: "absolute",
+            right: 18,
+            top: "50%",
+            transform: "translateY(-50%)",
+            width: 326,
+            maxWidth: "calc(100vw - 36px)",
+            zIndex: 500,
+            pointerEvents: "none",
+          }}
+        >
+          <div
+            style={{
+              pointerEvents: "auto",
+              borderRadius: 22,
+              padding: "16px 16px 14px",
+              background: "rgba(17,45,29,0.94)",
+              border: "1px solid rgba(74,222,128,0.18)",
+              color: "#effff3",
+              backdropFilter: "blur(18px)",
+              boxShadow: "0 22px 40px rgba(10,28,18,0.28)",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 12, marginBottom: 10 }}>
+              <div>
+                <p style={{ fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", color: "rgba(134,239,172,0.78)", marginBottom: 6 }}>
+                  Meetup Marker
+                </p>
+                <h3 style={{ fontSize: 23, lineHeight: 1.08, letterSpacing: "-0.5px" }}>
+                  {selectedMeetup.title}
+                </h3>
+              </div>
+              <button
+                onClick={() => setSelectedMeetupId(null)}
+                style={{
+                  width: 30,
+                  height: 30,
+                  borderRadius: 999,
+                  background: "rgba(255,255,255,0.08)",
+                  color: "#effff3",
+                  fontSize: 16,
+                  lineHeight: 1,
+                }}
+              >
+                X
+              </button>
+            </div>
+
+            <p style={{ fontSize: 12.5, color: "rgba(239,255,243,0.72)", lineHeight: 1.5, marginBottom: 12 }}>
+              {selectedMeetup.description}
+            </p>
+
+            <div style={{ display: "grid", gap: 8, marginBottom: 14 }}>
+              <p style={{ fontSize: 12, color: "rgba(134,239,172,0.95)" }}>
+                {formatDateTimeRange(selectedMeetup.startTime, selectedMeetup.endTime)}
+              </p>
+              <p style={{ fontSize: 12, color: "rgba(239,255,243,0.78)" }}>
+                {selectedMeetup.locationLabel}
+              </p>
+              <p style={{ fontSize: 12, color: "rgba(239,255,243,0.78)" }}>
+                {selectedMeetup.joinedCount} joined
+                {selectedMeetup.maxAttendees
+                  ? ` of ${selectedMeetup.maxAttendees} spots`
+                  : ""}
+              </p>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              <button
+                type="button"
+                onClick={() => router.push(`/community/meetups/${selectedMeetup.id}`)}
+                style={{
+                  width: "100%",
+                  borderRadius: 15,
+                  padding: "12px 14px",
+                  background: "rgba(255,255,255,0.08)",
+                  border: "1px solid rgba(255,255,255,0.10)",
+                  color: "#effff3",
+                  fontSize: 12.5,
+                  fontWeight: 800,
+                }}
+              >
+                View details
+              </button>
+              <button
+                type="button"
+                disabled={!token || Boolean(isGuest)}
+                onClick={() => void handleMeetupJoin(selectedMeetup.id)}
+                style={{
+                  width: "100%",
+                  borderRadius: 15,
+                  padding: "12px 14px",
+                  background: "linear-gradient(135deg, #4ade80 0%, #16a34a 100%)",
+                  color: "#04210e",
+                  fontSize: 12.5,
+                  fontWeight: 800,
+                  opacity: !token || isGuest ? 0.55 : 1,
+                }}
+              >
+                {selectedMeetup.viewerJoined ? "Open meetup chat" : "Join meetup chat"}
+              </button>
+            </div>
+
+            {!token || isGuest ? (
+              <p style={{ marginTop: 10, fontSize: 11.5, color: "rgba(239,255,243,0.68)" }}>
+                Sign in with a full account to join meetup chat.
+              </p>
+            ) : null}
+          </div>
+        </div>
+      ) : selectedLocation ? (
         <div
           style={{
             position: "absolute",
@@ -1166,13 +1349,14 @@ export default function OutreachMapDashboard() {
 
           </div>
         </div>
-      )}
+      ) : null}
 
       <div
         style={{
           position: "absolute",
-          right: 18,
+          left: "50%",
           bottom: 18,
+          transform: "translateX(-50%)",
           zIndex: 500,
         }}
       >
@@ -1338,6 +1522,18 @@ function areCentersEqual(
   return current.lat === next.lat && current.lng === next.lng;
 }
 
+function getVisibleMeetups(meetups: MeetupSummary[], viewport: MapViewportState) {
+  if (!viewport.bounds) {
+    return meetups;
+  }
+
+  return meetups.filter((meetup) =>
+    meetup.lat <= viewport.bounds!.north &&
+    meetup.lat >= viewport.bounds!.south &&
+    meetup.lng <= viewport.bounds!.east &&
+    meetup.lng >= viewport.bounds!.west,
+  );
+}
 function getHighlightedRegions(
   regions: MapNeedRegion[],
   regionLocationCounts: Map<string, number>,

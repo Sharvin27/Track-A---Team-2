@@ -158,6 +158,9 @@ export default function ChatbotWidget() {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [fabHovered, setFabHovered] = useState(false);
+  const [showNudge, setShowNudge] = useState(false);
+  const [nudgeDismissed, setNudgeDismissed] = useState(false);
+  const [hasOpened, setHasOpened] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -167,6 +170,20 @@ export default function ChatbotWidget() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading]);
+
+  // Show nudge bubble after 3s, auto-hide after 8s more
+  useEffect(() => {
+    if (nudgeDismissed || open) return;
+    const showTimer = setTimeout(() => setShowNudge(true), 10000);
+    const hideTimer = setTimeout(() => {
+      setShowNudge(false);
+      setNudgeDismissed(true);
+    }, 18000);
+    return () => {
+      clearTimeout(showTimer);
+      clearTimeout(hideTimer);
+    };
+  }, [nudgeDismissed, open]);
 
   useEffect(() => {
     if (open) setTimeout(() => inputRef.current?.focus(), 50);
@@ -260,7 +277,7 @@ export default function ChatbotWidget() {
           width: 400,
           minHeight: 550,
           maxHeight: 780,
-          zIndex: 199,
+          zIndex: 10001,
           borderRadius: 20,
           border: "1px solid rgba(190,155,70,0.22)",
           boxShadow: "0 12px 48px rgba(0,0,0,0.16)",
@@ -398,17 +415,80 @@ export default function ChatbotWidget() {
         </div>
       )}
 
+      {/* ── Nudge bubble ── */}
+      {showNudge && !open && (
+        <div
+          className="anim-fade-up"
+          style={{
+            position: "fixed",
+            bottom: 88,
+            right: 28,
+            zIndex: 10002,
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "10px 16px",
+            borderRadius: "14px 14px 4px 14px",
+            background: "#fffdf5",
+            border: "1px solid rgba(245,200,66,0.25)",
+            boxShadow: "0 8px 28px rgba(0,0,0,0.10), 0 2px 8px rgba(245,200,66,0.12)",
+            cursor: "pointer",
+          }}
+          onClick={() => {
+            setOpen(true);
+            setShowNudge(false);
+            setNudgeDismissed(true);
+          }}
+        >
+          <span style={{ fontSize: 16 }}>🍋</span>
+          <span style={{ fontSize: 13, fontWeight: 600, color: "#5f502d", whiteSpace: "nowrap" }}>
+            Need any help?
+          </span>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowNudge(false);
+              setNudgeDismissed(true);
+            }}
+            style={{
+              marginLeft: 4,
+              width: 18,
+              height: 18,
+              borderRadius: 99,
+              border: "none",
+              background: "rgba(0,0,0,0.06)",
+              color: "#9a8a60",
+              fontSize: 11,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+              flexShrink: 0,
+            }}
+          >
+            &times;
+          </button>
+        </div>
+      )}
+
       {/* ── FAB ── */}
       <button
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => {
+          setOpen((v) => !v);
+          setHasOpened(true);
+          setShowNudge(false);
+          setNudgeDismissed(true);
+        }}
         onMouseEnter={() => setFabHovered(true)}
         onMouseLeave={() => setFabHovered(false)}
         aria-label="Open help chat"
+        className={!open && !hasOpened ? "anim-fab-entrance" : undefined}
         style={{
           position: "fixed",
           bottom: 28,
           right: 28,
-          zIndex: 200,
+          zIndex: 10002,
           width: 52,
           height: 52,
           borderRadius: 16,
@@ -422,8 +502,8 @@ export default function ChatbotWidget() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          transform: fabHovered ? "scale(1.07)" : "scale(1)",
-          transition: "box-shadow 0.18s, transform 0.18s",
+          transform: fabHovered ? "scale(1.07)" : undefined,
+          transition: "transform 0.18s",
         }}
       >
         {open ? (

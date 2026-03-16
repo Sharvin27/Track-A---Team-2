@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useMemo, useRef } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CHAIN_PRICES, PRICE_LEVEL_LABEL } from "@/lib/printers";
 import {
   GeoJSON,
@@ -22,6 +22,7 @@ import type {
   MapViewportState,
 } from "./OutreachMapDashboard";
 import { latLngBounds } from "leaflet";
+import type { MeetupSummary } from "@/lib/social-types";
 
 const mapCenter: LatLngExpression = [40.7395, -73.9363];
 const INDIVIDUAL_MARKER_ZOOM = 15;
@@ -122,6 +123,17 @@ function createPrinterIcon() {
   });
 }
 
+function createMeetupMarkerIcon(selected: boolean) {
+  return divIcon({
+    className: "",
+    html: `<div class="meetup-marker-ring" style="${
+      selected ? "transform: scale(1.08);" : ""
+    }"></div>`,
+    iconSize: [24, 24],
+    iconAnchor: [12, 12],
+  });
+}
+
 function ViewportReporter({
   onViewportChange,
   onMapClick,
@@ -219,25 +231,31 @@ function ApplyFocusRequest({
 export default function OutreachMapCanvas({
   locations,
   printers,
+  meetups,
   highlightedRegions,
   recommendedLocationIds,
   routeItemDedupeKeys,
   selectedLocation,
+  selectedMeetup,
   focusRequest,
   onSelect,
   onTogglePrinterRoute,
+  onSelectMeetup,
   onMapClick,
   onViewportChange,
 }: {
   locations: MapLocation[];
   printers: MapPrinter[];
+  meetups: MeetupSummary[];
   highlightedRegions: MapNeedRegion[];
   recommendedLocationIds: string[];
   routeItemDedupeKeys: Set<string>;
   selectedLocation: MapLocation | null;
+  selectedMeetup: MeetupSummary | null;
   focusRequest: MapFocusRequest | null;
   onSelect: (id: string) => void;
   onTogglePrinterRoute: (printer: MapPrinter) => void;
+  onSelectMeetup: (id: number) => void;
   onMapClick: () => void;
   onViewportChange: (viewport: MapViewportState) => void;
 }) {
@@ -290,6 +308,11 @@ export default function OutreachMapCanvas({
         routeItemDedupeKeys={routeItemDedupeKeys}
         onTogglePrinterRoute={onTogglePrinterRoute}
       />
+      <MeetupMarkers
+        meetups={meetups}
+        selectedMeetup={selectedMeetup}
+        onSelectMeetup={onSelectMeetup}
+      />
     </MapContainer>
   );
 }
@@ -306,10 +329,28 @@ function LocationMarkers({
   onSelect: (id: string) => void;
 }) {
   const map = useMap();
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    // Wait until the map container is fully initialized
+    const check = () => {
+      try {
+        map.getZoom();
+        setReady(true);
+      } catch {
+        requestAnimationFrame(check);
+      }
+    };
+    check();
+  }, [map]);
+
   const recommendedIdSet = useMemo(
     () => new Set(recommendedLocationIds),
     [recommendedLocationIds],
   );
+
+  if (!ready) return null;
+
   const zoom = map.getZoom();
   const clusters =
     zoom < INDIVIDUAL_MARKER_ZOOM
@@ -590,4 +631,42 @@ function clusterLocations(
   }
 
   return Array.from(clusters.values());
+}
+
+function MeetupMarkers({
+  meetups,
+  selectedMeetup,
+  onSelectMeetup,
+}: {
+  meetups: MeetupSummary[];
+  selectedMeetup: MeetupSummary | null;
+  onSelectMeetup: (id: number) => void;
+}) {
+  return (
+    <>
+      {meetups.map((meetup) => (
+        <Marker
+          key={meetup.id}
+          position={[meetup.lat, meetup.lng]}
+          icon={createMeetupMarkerIcon(meetup.id === selectedMeetup?.id)}
+          eventHandlers={{
+            click: () => onSelectMeetup(meetup.id),
+          }}
+        >
+          <Popup>
+            <div style={{ minWidth: 190 }}>
+              <strong>{meetup.title}</strong>
+              <div style={{ marginTop: 4 }}>{meetup.locationLabel}</div>
+              <div style={{ marginTop: 6 }}>
+                {new Date(meetup.startTime).toLocaleString()}
+              </div>
+              <div style={{ marginTop: 6, color: "#166534" }}>
+                {meetup.joinedCount} volunteer{meetup.joinedCount === 1 ? "" : "s"} joined
+              </div>
+            </div>
+          </Popup>
+        </Marker>
+      ))}
+    </>
+  );
 }
