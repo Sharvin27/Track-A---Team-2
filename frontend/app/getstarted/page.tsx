@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import PageContainer from "@/components/layout/PageContainer";
 import SectionCard from "@/components/common/SectionCard";
 import GetFlyersWithQr from "@/components/getstarted/GetFlyersWithQr";
@@ -44,6 +47,16 @@ const faqs = [
 ];
 
 export default function GetStartedPage() {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 700px)");
+    const sync = () => setIsMobile(mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
+
   return (
     <PageContainer>
 
@@ -72,7 +85,7 @@ export default function GetStartedPage() {
       {/* ── Steps ─────────────────────────────────────────────── */}
       <div
         className="anim-fade-up d2"
-        style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 16, marginBottom: 24 }}
+        style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(2, 1fr)", gap: 16, marginBottom: 24 }}
       >
         {steps.map((s) => (
           <div
@@ -126,7 +139,7 @@ export default function GetStartedPage() {
         subtitle="Everything you need to know before you start"
         style={{ marginBottom: 24 }}
       >
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "12px 40px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(2, 1fr)", gap: "12px 40px" }}>
           {faqs.map((faq, i) => (
             <div key={faq.q} style={{ padding: "14px 0", borderBottom: i < 4 ? "1px solid rgba(190,155,70,0.12)" : "none" }}>
               <p style={{ fontSize: 13.5, fontWeight: 600, color: "#1a1600", marginBottom: 5 }}>{faq.q}</p>

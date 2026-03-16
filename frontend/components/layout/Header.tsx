@@ -262,36 +262,6 @@ export default function Header({
               Go
             </button>
           </form>
-        ) : !isMobile ? (
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              padding: "7px 14px",
-              borderRadius: 10,
-              background: "rgba(0,0,0,0.045)",
-              border: "1px solid rgba(0,0,0,0.07)",
-              color: "#9a8a60",
-              fontSize: 12.5,
-              cursor: "text",
-              width: 170,
-            }}
-          >
-            <svg
-              width="13"
-              height="13"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.2"
-              strokeLinecap="round"
-            >
-              <circle cx="11" cy="11" r="8" />
-              <line x1="21" y1="21" x2="16.65" y2="16.65" />
-            </svg>
-            Search...
-          </div>
         ) : null}
 
         <a
@@ -361,45 +331,6 @@ export default function Header({
             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
           </svg>
         </Link>
-
-        <button
-          style={{
-            width: 36,
-            height: 36,
-            borderRadius: 10,
-            background: "rgba(0,0,0,0.04)",
-            border: "1px solid rgba(190,155,70,0.18)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            position: "relative",
-          }}
-        >
-          <svg
-            width="15"
-            height="15"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="#6a5a30"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-          >
-            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-            <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-          </svg>
-          <span
-            style={{
-              position: "absolute",
-              top: 7,
-              right: 7,
-              width: 7,
-              height: 7,
-              borderRadius: "50%",
-              background: "#ef4444",
-              border: "1.5px solid #fdf8e8",
-            }}
-          />
-        </button>
 
         <Link href="/profile">
           <div

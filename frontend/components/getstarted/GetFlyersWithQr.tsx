@@ -84,7 +84,7 @@ export default function GetFlyersWithQr() {
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            zIndex: 50,
+            zIndex: 10000,
           }}
         >
           <div
@@ -116,7 +116,7 @@ export default function GetFlyersWithQr() {
             {loading && <p style={{ fontSize: 12, color: "#6b4f1f" }}>Generating…</p>}
 
             {!loading && qrImageUrl && (
-              <div style={{ marginBottom: 12 }}>
+              <div style={{ marginBottom: 12, display: "flex", justifyContent: "center" }}>
                 <img
                   src={qrImageUrl}
                   alt="Your Lemontree QR code"
