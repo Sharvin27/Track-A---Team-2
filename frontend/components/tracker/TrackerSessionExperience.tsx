@@ -341,8 +341,9 @@ export default function TrackerSessionExperience({
       style={{
         position: "relative",
         height,
-        minHeight: 640,
+        minHeight: isMobile ? "100%" : 640,
         overflow: "hidden",
+        overscrollBehavior: "none",
         background: "#dbe7dd",
       }}
     >
@@ -851,10 +852,12 @@ function OverlayPill({
       style={{
         padding: compact ? "9px 10px" : "10px 12px",
         borderRadius: compact ? 16 : 18,
-        background: "rgba(255,248,232,0.16)",
-        color: "#fff8e8",
-        backdropFilter: "blur(12px)",
+        background: compact ? "rgba(255,248,232,0.92)" : "rgba(255,248,232,0.16)",
+        color: compact ? "#2f2410" : "#fff8e8",
+        backdropFilter: compact ? "blur(16px)" : "blur(12px)",
         minWidth: compact ? 0 : 82,
+        border: compact ? "1px solid rgba(245,200,66,0.22)" : "none",
+        boxShadow: compact ? "0 12px 28px rgba(17,14,6,0.16)" : "none",
       }}
     >
       <p
@@ -864,12 +867,12 @@ function OverlayPill({
           fontWeight: 700,
           letterSpacing: "0.08em",
           textTransform: "uppercase",
-          color: "rgba(245,200,66,0.72)",
+          color: compact ? "#a36f00" : "rgba(245,200,66,0.72)",
         }}
       >
         {label}
       </p>
-      <p style={{ margin: "4px 0 0", fontSize: compact ? 14 : 16, fontWeight: 700 }}>{value}</p>
+      <p style={{ margin: "4px 0 0", fontSize: compact ? 14 : 16, fontWeight: 800 }}>{value}</p>
     </div>
   );
 }

@@ -923,8 +923,9 @@ export default function OutreachMapDashboard() {
       style={{
         position: "relative",
         height: "100%",
-        minHeight: 640,
+        minHeight: isMobile ? "100%" : 640,
         overflow: "hidden",
+        overscrollBehavior: "none",
         background: "#dbe7dd",
       }}
     >

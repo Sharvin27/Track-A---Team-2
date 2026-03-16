@@ -168,7 +168,7 @@ export default function CoverageProofModal({
       <div
         style={{
           width: "min(100%, 540px)",
-          maxHeight: isMobile ? "min(78dvh, 680px)" : "calc(100dvh - 24px)",
+          maxHeight: isMobile ? "min(72dvh, 620px)" : "calc(100dvh - 24px)",
           borderRadius: isMobile ? 20 : 24,
           border: "1px solid rgba(74, 222, 128, 0.18)",
           background:
@@ -190,7 +190,7 @@ export default function CoverageProofModal({
             alignItems: "flex-start",
           }}
         >
-          <div>
+          <div style={{ minWidth: 0, flex: 1 }}>
             <p
               style={{
                 margin: 0,
@@ -221,6 +221,7 @@ export default function CoverageProofModal({
             style={{
               width: 34,
               height: 34,
+              flexShrink: 0,
               borderRadius: 999,
               border: "1px solid rgba(255,255,255,0.12)",
               background: "rgba(255,255,255,0.06)",
@@ -308,7 +309,7 @@ export default function CoverageProofModal({
                 borderRadius: 18,
                 border: "1px dashed rgba(134, 239, 172, 0.28)",
                 background: "rgba(22, 163, 74, 0.05)",
-                minHeight: isMobile ? 160 : 220,
+                minHeight: isMobile ? 132 : 220,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -324,7 +325,7 @@ export default function CoverageProofModal({
                   style={{
                     display: "block",
                     width: "100%",
-                    maxHeight: isMobile ? 220 : 320,
+                    maxHeight: isMobile ? 168 : 320,
                     objectFit: "cover",
                   }}
                 />
