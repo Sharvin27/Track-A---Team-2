@@ -220,7 +220,7 @@ export default function DMThreadList({
           No conversations yet. Click <strong>New message</strong> above to start one.
         </div>
       ) : (
-        <div style={{ display: "grid", gap: 10 }}>
+        <div style={{ display: "grid", gap: 6 }}>
           {threads.map((thread) => {
             const isActive = pathname === `/messages/${thread.id}`;
 
@@ -230,21 +230,21 @@ export default function DMThreadList({
                 href={`/messages/${thread.id}`}
                 style={{
                   display: "block",
-                  borderRadius: 18,
+                  borderRadius: 12,
                   border: isActive
                     ? "1px solid rgba(245,200,66,0.30)"
-                    : "1px solid rgba(190,155,70,0.16)",
+                    : "1px solid rgba(190,155,70,0.12)",
                   background: isActive ? "rgba(245,200,66,0.10)" : "#ffffff",
-                  boxShadow: "0 10px 20px rgba(31,43,18,0.05)",
-                  padding: 14,
+                  boxShadow: "0 2px 8px rgba(31,43,18,0.04)",
+                  padding: "10px 12px",
                   textDecoration: "none",
                 }}
               >
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center" }}>
                   <UserIdentity
                     user={thread.otherUser}
                     subtitle={`@${thread.otherUser.username}`}
-                    size={36}
+                    size={30}
                   />
                   {thread.unreadCount > 0 ? (
                     <div
@@ -266,10 +266,10 @@ export default function DMThreadList({
                     </div>
                   ) : null}
                 </div>
-                <div style={{ marginTop: 10, fontSize: 12.5, color: "#4b5563", lineHeight: 1.5 }}>
+                <div style={{ marginTop: 6, fontSize: 12, color: "#4b5563", lineHeight: 1.45, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {thread.lastMessageText || `Start a conversation with ${formatDisplayName(thread.otherUser)}.`}
                 </div>
-                <div style={{ marginTop: 8, fontSize: 11, color: "#8a7a50" }}>
+                <div style={{ marginTop: 4, fontSize: 10.5, color: "#8a7a50" }}>
                   {thread.lastMessageAt ? formatRelativeTime(thread.lastMessageAt) : "New thread"}
                 </div>
               </Link>
