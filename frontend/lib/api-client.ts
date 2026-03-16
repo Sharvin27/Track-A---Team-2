@@ -1,7 +1,23 @@
+const PUBLIC_API_FALLBACK = "https://track-a-team-2.onrender.com";
+
+function getFallbackApiBase() {
+  if (typeof window !== "undefined") {
+    const isLocalHost =
+      window.location.hostname === "localhost" ||
+      window.location.hostname === "127.0.0.1";
+
+    if (isLocalHost) {
+      return "http://localhost:5001";
+    }
+  }
+
+  return PUBLIC_API_FALLBACK;
+}
+
 export const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE_URL ||
   process.env.NEXT_PUBLIC_API_URL ||
-  "http://localhost:5001";
+  getFallbackApiBase();
 
 type ApiFetchOptions = {
   token?: string | null;
