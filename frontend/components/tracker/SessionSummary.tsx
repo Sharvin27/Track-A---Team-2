@@ -1,5 +1,6 @@
 import Image from "next/image";
 import SectionCard from "@/components/common/SectionCard";
+import SessionRoutePreview from "@/components/tracker/SessionRoutePreview";
 import { formatDistance } from "@/lib/distance";
 import { formatDuration, formatStopType } from "@/lib/session";
 import type { VolunteerSession } from "@/types/tracker";
@@ -27,6 +28,10 @@ export default function SessionSummary({
 
   return (
     <SectionCard title="Session Summary" subtitle="Captured route details for the latest volunteer session.">
+      <div style={{ marginBottom: 16 }}>
+        <SessionRoutePreview session={session} height={260} />
+      </div>
+
       {session.routeImageUrl ? (
         <div
           style={{
@@ -43,7 +48,7 @@ export default function SessionSummary({
             width={1200}
             height={700}
             unoptimized
-            style={{ display: "block", width: "100%", maxHeight: 240, objectFit: "cover" }}
+            style={{ display: "block", width: "100%", maxHeight: 200, objectFit: "cover" }}
           />
         </div>
       ) : null}

@@ -149,6 +149,7 @@ export default function LeaderboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [period, setPeriod] = useState<"all" | "month" | "week">("all");
   const [totalVolunteers, setTotalVolunteers] = useState(0);
+  const [totalFlyersAll, setTotalFlyersAll] = useState(0);
   const [totalScansAll, setTotalScansAll] = useState(0);
   const [totalHoursAll, setTotalHoursAll] = useState(0);
 
@@ -163,6 +164,7 @@ export default function LeaderboardPage() {
           setEntries(response.data);
           setPodiumEntries(response.podium ?? []);
           setTotalVolunteers(response.totalVolunteers ?? 0);
+          setTotalFlyersAll(response.totalFlyers ?? 0);
           setTotalScansAll(response.totalScans ?? 0);
           setTotalHoursAll(response.totalHours ?? 0);
         }
@@ -240,18 +242,18 @@ export default function LeaderboardPage() {
 
   const computedStats = useMemo(() => {
     return [
-      { label: "Total Scans", value: totalScansAll.toLocaleString(), icon: "SC" },
+      { label: "Flyers Uploaded", value: totalFlyersAll.toLocaleString(), icon: "FL" },
+      { label: "QR Scans", value: totalScansAll.toLocaleString(), icon: "SC" },
       { label: "Active Volunteers", value: totalVolunteers.toLocaleString(), icon: "AV" },
-      { label: "Locations Covered", value: "12", icon: "LC" },
       { label: "Total Hours", value: String(totalHoursAll), icon: "HR" },
     ];
-  }, [totalScansAll, totalVolunteers, totalHoursAll]);
+  }, [totalFlyersAll, totalScansAll, totalVolunteers, totalHoursAll]);
 
   const personAhead = yourIndex > 0 ? displayRows[yourIndex - 1] : null;
-  const yourScans = yourStanding?.flyers ?? 0;
-  const aheadScans = personAhead?.flyers ?? yourScans;
+  const yourFlyers = yourStanding?.flyers ?? 0;
+  const aheadFlyers = personAhead?.flyers ?? yourFlyers;
   const progressToNext =
-    personAhead && aheadScans > 0 ? Math.min(100, (yourScans / aheadScans) * 100) : 100;
+    personAhead && aheadFlyers > 0 ? Math.min(100, (yourFlyers / aheadFlyers) * 100) : 100;
 
   if (user?.isGuest) {
     return (
@@ -311,7 +313,7 @@ export default function LeaderboardPage() {
                   Champions Podium
                 </h3>
                 <p style={{ fontSize: 12, color: "rgba(245,200,66,0.45)", marginTop: 2 }}>
-                  {periodLabel} &middot; Ranked by scans
+                  {periodLabel} &middot; Ranked by flyers
                 </p>
               </div>
             </div>
@@ -416,11 +418,11 @@ export default function LeaderboardPage() {
                 <div style={{ marginTop: 4 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
                     <span style={{ fontSize: 11, color: "rgba(245,200,66,0.5)" }}>
-                      You | {yourScans.toLocaleString()} scans
+                      You | {yourFlyers.toLocaleString()} flyers
                     </span>
                     <span style={{ fontSize: 11, color: "rgba(245,200,66,0.5)" }}>
                       {personAhead
-                        ? `${personAhead.username} | ${aheadScans.toLocaleString()} scans`
+                        ? `${personAhead.username} | ${aheadFlyers.toLocaleString()} flyers`
                         : "Top position"}
                     </span>
                   </div>
@@ -451,7 +453,7 @@ export default function LeaderboardPage() {
                     }}
                   >
                     {personAhead
-                      ? `${Math.max(0, aheadScans - yourScans).toLocaleString()} more scans to move up`
+                      ? `${Math.max(0, aheadFlyers - yourFlyers).toLocaleString()} more flyers to move up`
                       : "You are leading the board"}
                   </p>
                 </div>
@@ -526,7 +528,7 @@ export default function LeaderboardPage() {
 
       <SectionCard
         title="Full Rankings"
-        subtitle={`Top ${displayRows.length || 0} volunteers | ranked by scans`}
+        subtitle={`Top ${displayRows.length || 0} volunteers | ranked by flyers`}
         action={
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
             {([["All Time", "all"], ["This Month", "month"], ["This Week", "week"]] as const).map(([label, value]) => {
@@ -562,14 +564,14 @@ export default function LeaderboardPage() {
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "44px minmax(180px, 1fr) 90px 70px",
+                gridTemplateColumns: "44px minmax(180px, 1fr) 90px 90px 70px",
                 gap: 12,
                 padding: "0 10px 10px",
                 borderBottom: "1px solid rgba(190,155,70,0.15)",
-                minWidth: 400,
+                minWidth: 500,
               }}
             >
-              {["#", "Volunteer", "Scans", "Hours"].map((heading) => (
+              {["#", "Volunteer", "Flyers", "Scans", "Hours"].map((heading) => (
                 <span
                   key={heading}
                   style={{
@@ -613,7 +615,7 @@ export default function LeaderboardPage() {
                 style={{
                   animationDelay: `${0.3 + index * 0.06}s`,
                   display: "grid",
-                  gridTemplateColumns: "44px minmax(180px, 1fr) 90px 70px",
+                  gridTemplateColumns: "44px minmax(180px, 1fr) 90px 90px 70px",
                   gap: 12,
                   alignItems: "center",
                   padding: "10px 10px",
@@ -628,7 +630,7 @@ export default function LeaderboardPage() {
                   border: rowBorder,
                   boxShadow: topThreeBackground ? `0 10px 24px ${rankColors[volunteer.rank]}18` : "none",
                   marginBottom: 3,
-                  minWidth: 400,
+                  minWidth: 500,
                 }}
               >
                 <div style={{ textAlign: "center" }}>
@@ -735,6 +737,17 @@ export default function LeaderboardPage() {
                   }}
                 >
                   {volunteer.flyers.toLocaleString()}
+                </span>
+
+                <span
+                  style={{
+                    fontSize: 14,
+                    fontWeight: 700,
+                    color: "#7c3aed",
+                    fontFamily: "'Fraunces', Georgia, serif",
+                  }}
+                >
+                  {volunteer.scans.toLocaleString()}
                 </span>
 
                 <span style={{ fontSize: 13, color: "#5a4a20" }}>{volunteer.hoursLabel}</span>

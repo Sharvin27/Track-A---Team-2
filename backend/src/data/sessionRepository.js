@@ -1,4 +1,8 @@
 const { pool } = require("../db");
+const {
+  normalizeRoutePoints,
+  normalizeSessionStops,
+} = require("../services/sessionNormalization");
 
 function toIsoString(value) {
   if (!value) return null;
@@ -14,8 +18,8 @@ function mapRowToSession(row) {
     startTime: toIsoString(row.started_at),
     endTime: toIsoString(row.ended_at),
     status: row.status,
-    routePoints: row.route_points_json ?? [],
-    stops: row.stops_json ?? [],
+    routePoints: normalizeRoutePoints(row.route_points_json ?? []),
+    stops: normalizeSessionStops(row.stops_json ?? []),
     durationSeconds: row.duration_seconds,
     totalDistanceMeters: Number(row.distance_meters ?? 0),
     totalDistanceMiles: Number(row.distance_miles ?? 0),

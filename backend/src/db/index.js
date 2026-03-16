@@ -7,6 +7,10 @@ const communitySchemaPath = path.resolve(
   __dirname,
   "../../sql/community_meetups_chat.sql",
 );
+const hotspotCoverageSchemaPath = path.resolve(
+  __dirname,
+  "../../sql/hotspot_coverage_proofs.sql",
+);
 
 function getConnectionString() {
   return process.env.DATABASE_URL;
@@ -256,6 +260,10 @@ async function initDb() {
 
     if (fs.existsSync(communitySchemaPath)) {
       await client.query(fs.readFileSync(communitySchemaPath, "utf8"));
+    }
+
+    if (fs.existsSync(hotspotCoverageSchemaPath)) {
+      await client.query(fs.readFileSync(hotspotCoverageSchemaPath, "utf8"));
     }
   } finally {
     client.release();

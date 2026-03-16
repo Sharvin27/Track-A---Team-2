@@ -24,6 +24,7 @@ import {
   createSessionStop,
   formatDuration,
 } from "@/lib/session";
+import { normalizeVolunteerSession } from "@/lib/tracker-route";
 import type {
   RoutePoint,
   SessionApiResponse,
@@ -53,9 +54,19 @@ export default function TrackerPage() {
   const [isShareOpen, setIsShareOpen] = useState(false);
 
   const isTracking = activeSession?.status === "tracking";
-  const summarySession = activeSession ?? lastCompletedSession;
-  const displayedRoutePoints = activeSession?.routePoints ?? lastCompletedSession?.routePoints ?? [];
-  const displayedStops = activeSession?.stops ?? lastCompletedSession?.stops ?? [];
+  const normalizedActiveSession = useMemo(
+    () => (activeSession ? normalizeVolunteerSession(activeSession) : null),
+    [activeSession],
+  );
+  const summarySession = useMemo(
+    () => {
+      const nextSession = activeSession ?? lastCompletedSession;
+      return nextSession ? normalizeVolunteerSession(nextSession) : null;
+    },
+    [activeSession, lastCompletedSession],
+  );
+  const displayedRoutePoints = summarySession?.routePoints ?? [];
+  const displayedStops = summarySession?.stops ?? [];
   const handleSnapshotReady = useCallback((capture: (() => Promise<string | null>) | null) => {
     captureSnapshotRef.current = capture;
   }, []);
@@ -81,7 +92,7 @@ export default function TrackerPage() {
   }, []);
 
   const liveStats = useMemo(() => {
-    if (!activeSession) {
+    if (!normalizedActiveSession) {
       return {
         points: 0,
         stops: 0,
@@ -92,31 +103,30 @@ export default function TrackerPage() {
 
     const durationSeconds = Math.max(
       0,
-      Math.round((Date.now() - new Date(activeSession.startTime).getTime()) / 1000),
+      Math.round((Date.now() - new Date(normalizedActiveSession.startTime).getTime()) / 1000),
     );
 
     return {
-      points: activeSession.routePoints.length,
-      stops: activeSession.stops.length,
+      points: normalizedActiveSession.routePoints.length,
+      stops: normalizedActiveSession.stops.length,
       duration: formatDuration(durationSeconds),
-      distance: formatDistance(activeSession.totalDistanceMeters),
+      distance: formatDistance(normalizedActiveSession.totalDistanceMeters),
     };
-  }, [activeSession]);
+  }, [normalizedActiveSession]);
 
   function handlePosition(position: GeolocationPosition) {
     const nextPoint = createRoutePoint(position);
-    setCurrentPoint(nextPoint);
     setErrorMessage(null);
     setStatusMessage("Tracking live route.");
+    let acceptedPoint = false;
 
     setActiveSession((current) => {
       if (!current) {
         return current;
       }
 
-      const nextRoutePoints = shouldAppendRoutePoint(current.routePoints, nextPoint)
-        ? [...current.routePoints, nextPoint]
-        : current.routePoints;
+      acceptedPoint = shouldAppendRoutePoint(current.routePoints, nextPoint);
+      const nextRoutePoints = acceptedPoint ? [...current.routePoints, nextPoint] : current.routePoints;
 
       return {
         ...current,
@@ -124,6 +134,10 @@ export default function TrackerPage() {
         totalDistanceMeters: calculateRouteDistanceMeters(nextRoutePoints),
       };
     });
+
+    if (acceptedPoint) {
+      setCurrentPoint(nextPoint);
+    }
   }
 
   function handlePositionError(error: GeolocationPositionError) {
