@@ -54,6 +54,8 @@ export default function TrackerSessionExperience({
 }: TrackerSessionExperienceProps) {
   const watchIdRef = useRef<number | null>(null);
   const captureSnapshotRef = useRef<(() => Promise<string | null>) | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
+  const [isMobileControlsOpen, setIsMobileControlsOpen] = useState(false);
   const [activeSession, setActiveSession] = useState<VolunteerSession | null>(null);
   const [lastCompletedSession, setLastCompletedSession] = useState<VolunteerSession | null>(null);
   const [currentPoint, setCurrentPoint] = useState<RoutePoint | null>(null);
@@ -121,6 +123,27 @@ export default function TrackerSessionExperience({
       "noopener,noreferrer",
     );
   }, [currentPoint, orderedPlannedItems]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const mediaQuery = window.matchMedia("(max-width: 768px)");
+    const updateViewport = (event?: MediaQueryListEvent) => {
+      const matches = event?.matches ?? mediaQuery.matches;
+      setIsMobile(matches);
+
+      if (!matches) {
+        setIsMobileControlsOpen(false);
+      }
+    };
+
+    updateViewport();
+    mediaQuery.addEventListener("change", updateViewport);
+
+    return () => mediaQuery.removeEventListener("change", updateViewport);
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -578,49 +601,131 @@ export default function TrackerSessionExperience({
         saveError={saveError}
       />
 
-      <div
-        style={{
-          position: "absolute",
-          right: 18,
-          bottom: 18,
-          width: 340,
-          maxWidth: "calc(100vw - 36px)",
-          zIndex: 500,
-        }}
-      >
+      {isMobile ? (
         <div
           style={{
-            borderRadius: 24,
-            padding: 18,
-            background: "rgba(255,252,244,0.96)",
-            border: "1px solid rgba(190,155,70,0.18)",
-            backdropFilter: "blur(18px)",
-            boxShadow: "0 18px 40px rgba(32,24,8,0.12)",
-            display: "grid",
-            gap: 12,
+            position: "absolute",
+            right: 12,
+            top: "50%",
+            transform: "translateY(-50%)",
+            zIndex: 500,
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            pointerEvents: "none",
           }}
         >
-          <TrackerControls
-            isTracking={Boolean(isTracking)}
-            onStart={handleStartSession}
-            onStop={handleStopSession}
-            onAddStop={handleAddStop}
-            isBusy={saveState === "saving"}
-            onOpenGoogleMapsRoute={handleOpenGoogleMapsRoute}
-            canOpenGoogleMapsRoute={orderedPlannedItems.length > 0}
-          />
-          {errorMessage ? (
-            <p style={{ fontSize: 12.5, color: "#b91c1c", lineHeight: 1.5 }}>
-              {errorMessage}
-            </p>
+          {isMobileControlsOpen ? (
+            <div
+              style={{
+                width: "min(320px, calc(100vw - 78px))",
+                maxHeight: "78dvh",
+                overflowY: "auto",
+                pointerEvents: "auto",
+                borderRadius: 24,
+                padding: 16,
+                background: "rgba(255,252,244,0.97)",
+                border: "1px solid rgba(190,155,70,0.18)",
+                backdropFilter: "blur(18px)",
+                boxShadow: "0 18px 40px rgba(32,24,8,0.16)",
+                display: "grid",
+                gap: 12,
+              }}
+            >
+              <TrackerControls
+                isTracking={Boolean(isTracking)}
+                onStart={handleStartSession}
+                onStop={handleStopSession}
+                onAddStop={handleAddStop}
+                isBusy={saveState === "saving"}
+                onOpenGoogleMapsRoute={handleOpenGoogleMapsRoute}
+                canOpenGoogleMapsRoute={orderedPlannedItems.length > 0}
+              />
+              {errorMessage ? (
+                <p style={{ fontSize: 12.5, color: "#b91c1c", lineHeight: 1.5 }}>
+                  {errorMessage}
+                </p>
+              ) : null}
+              {saveError ? (
+                <p style={{ fontSize: 12.5, color: "#b91c1c", lineHeight: 1.5 }}>
+                  {saveError}
+                </p>
+              ) : null}
+            </div>
           ) : null}
-          {saveError ? (
-            <p style={{ fontSize: 12.5, color: "#b91c1c", lineHeight: 1.5 }}>
-              {saveError}
-            </p>
-          ) : null}
+
+          <button
+            type="button"
+            onClick={() => setIsMobileControlsOpen((current) => !current)}
+            style={{
+              pointerEvents: "auto",
+              width: 54,
+              minHeight: 110,
+              borderRadius: 18,
+              padding: "12px 10px",
+              background: "linear-gradient(135deg, rgba(26,18,0,0.92) 0%, rgba(58,39,0,0.96) 100%)",
+              border: "1px solid rgba(245,200,66,0.24)",
+              color: "#fff7de",
+              boxShadow: "0 16px 34px rgba(26,16,0,0.22)",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 4,
+              fontSize: 11,
+              fontWeight: 800,
+              lineHeight: 1.1,
+            }}
+          >
+            <span>{isMobileControlsOpen ? "Close" : "Route"}</span>
+            <span>{isMobileControlsOpen ? "Panel" : "Tools"}</span>
+          </button>
         </div>
-      </div>
+      ) : (
+        <div
+          style={{
+            position: "absolute",
+            right: 18,
+            bottom: 18,
+            width: 340,
+            maxWidth: "calc(100vw - 36px)",
+            zIndex: 500,
+          }}
+        >
+          <div
+            style={{
+              borderRadius: 24,
+              padding: 18,
+              background: "rgba(255,252,244,0.96)",
+              border: "1px solid rgba(190,155,70,0.18)",
+              backdropFilter: "blur(18px)",
+              boxShadow: "0 18px 40px rgba(32,24,8,0.12)",
+              display: "grid",
+              gap: 12,
+            }}
+          >
+            <TrackerControls
+              isTracking={Boolean(isTracking)}
+              onStart={handleStartSession}
+              onStop={handleStopSession}
+              onAddStop={handleAddStop}
+              isBusy={saveState === "saving"}
+              onOpenGoogleMapsRoute={handleOpenGoogleMapsRoute}
+              canOpenGoogleMapsRoute={orderedPlannedItems.length > 0}
+            />
+            {errorMessage ? (
+              <p style={{ fontSize: 12.5, color: "#b91c1c", lineHeight: 1.5 }}>
+                {errorMessage}
+              </p>
+            ) : null}
+            {saveError ? (
+              <p style={{ fontSize: 12.5, color: "#b91c1c", lineHeight: 1.5 }}>
+                {saveError}
+              </p>
+            ) : null}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
