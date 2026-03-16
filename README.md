@@ -88,9 +88,15 @@ The frontend currently references more than one API base env name in code:
 
 - `NEXT_PUBLIC_API_URL`
 - `NEXT_PUBLIC_API_BASE_URL`
+- `NEXT_PUBLIC_APP_URL`
 - `GOOGLE_MAPS_API_KEY`
 
 For demo stability, these should be consolidated.
+
+For QR code generation in Step 2:
+
+- `NEXT_PUBLIC_APP_URL` should be the public frontend URL, for example `https://your-app.vercel.app`
+- `NEXT_PUBLIC_API_BASE_URL` should be the public backend/API URL used by the QR forwarding route
 
 ## Demo path
 
