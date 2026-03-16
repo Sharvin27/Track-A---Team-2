@@ -7,6 +7,7 @@ const authRoutes = require("./routes/authRoutes");
 const leaderboardRoutes = require("./routes/leaderboardRoutes");
 const activityRoutes = require("./routes/activityRoutes");
 const badgesRoutes = require("./routes/badgesRoutes");
+const routeItemRoutes = require("./routes/routeItemRoutes");
 
 const app = express();
 
@@ -24,5 +25,6 @@ app.use("/api/auth", authRoutes);
 app.use("/api/leaderboard", leaderboardRoutes);
 app.use("/api/activity", activityRoutes);
 app.use("/api/badges", badgesRoutes);
+app.use("/api/route-items", routeItemRoutes);
 
 module.exports = app;

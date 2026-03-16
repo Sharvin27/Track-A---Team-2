@@ -9,6 +9,8 @@ interface TrackerControlsProps {
   onStart: () => void;
   onStop: () => void;
   onAddStop: (type: StopType, label?: string) => void;
+  onOpenGoogleMapsRoute?: () => void;
+  canOpenGoogleMapsRoute?: boolean;
 }
 
 const STOP_OPTIONS: Array<{ value: StopType; label: string }> = [
@@ -25,6 +27,8 @@ export default function TrackerControls({
   onStart,
   onStop,
   onAddStop,
+  onOpenGoogleMapsRoute,
+  canOpenGoogleMapsRoute = false,
 }: TrackerControlsProps) {
   const [stopType, setStopType] = useState<StopType>("printer");
   const [label, setLabel] = useState("");
@@ -50,6 +54,15 @@ export default function TrackerControls({
           Stop Session
         </button>
       </div>
+
+      <button
+        type="button"
+        onClick={onOpenGoogleMapsRoute}
+        disabled={!canOpenGoogleMapsRoute || disabled}
+        style={mapsButton(!canOpenGoogleMapsRoute || disabled)}
+      >
+        Open Route in Google Maps
+      </button>
 
       <div
         style={{
@@ -165,6 +178,20 @@ function tertiaryButton(disabled: boolean): React.CSSProperties {
     fontWeight: 700,
     fontSize: 14,
     opacity: disabled ? 0.65 : 1,
+  };
+}
+
+function mapsButton(disabled: boolean): React.CSSProperties {
+  return {
+    minHeight: 50,
+    padding: "12px 16px",
+    borderRadius: 16,
+    border: "1px solid rgba(66,133,244,0.18)",
+    background: disabled ? "rgba(232,239,252,0.72)" : "#eef4ff",
+    color: disabled ? "#8ea1c7" : "#2958b8",
+    fontWeight: 700,
+    fontSize: 14,
+    opacity: disabled ? 0.7 : 1,
   };
 }
 

@@ -2,102 +2,19 @@
 
 import { useState, useEffect, useRef } from "react";
 import PageContainer from "@/components/layout/PageContainer";
-
-function getMiles(lat1: number, lng1: number, lat2: number, lng2: number): number {
-  const R = 3958.8;
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLng = ((lng2 - lng1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLng / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-
-function getEmoji(name: string): string {
-  const n = name.toLowerCase();
-  if (n.includes("fedex") || n.includes("kinkos")) return "📮";
-  if (n.includes("ups")) return "📦";
-  if (n.includes("staples")) return "🖊️";
-  if (n.includes("library")) return "📚";
-  if (n.includes("office depot") || n.includes("officemax")) return "🗂️";
-  return "🖨️";
-}
-
-/** Known per-page print rates for major chains. */
-const CHAIN_PRICES: { match: RegExp; bw: string; color: string }[] = [
-  { match: /staples/i,                  bw: "$0.09/page B&W", color: "$0.49/page Color" },
-  { match: /fedex|kinkos/i,             bw: "$0.12/page B&W", color: "$0.55/page Color" },
-  { match: /ups\s*store/i,              bw: "$0.14/page B&W", color: "$0.79/page Color" },
-  { match: /office\s*depot|officemax/i, bw: "$0.09/page B&W", color: "$0.45/page Color" },
-];
-
-const PRICE_LEVEL_LABEL: Record<string, { label: string; color: string; bg: string }> = {
-  PRICE_LEVEL_FREE:           { label: "Free", color: "#15803d", bg: "#dcfce7" },
-  PRICE_LEVEL_INEXPENSIVE:    { label: "$",    color: "#15803d", bg: "#dcfce7" },
-  PRICE_LEVEL_MODERATE:       { label: "$$",   color: "#92400e", bg: "rgba(245,200,66,0.18)" },
-  PRICE_LEVEL_EXPENSIVE:      { label: "$$$",  color: "#9a3412", bg: "#ffedd5" },
-  PRICE_LEVEL_VERY_EXPENSIVE: { label: "$$$$", color: "#7f1d1d", bg: "#fee2e2" },
-};
+import {
+  CHAIN_PRICES,
+  fetchPrinters,
+  getPrinterEmoji,
+  PRICE_LEVEL_LABEL,
+  type Printer,
+} from "@/lib/printers";
 
 interface Suggestion {
   placeId: string;
   label: string;
   main: string;
   secondary: string;
-}
-
-interface Printer {
-  id: string;
-  name: string;
-  address: string;
-  distance: number;
-  hours: string;
-  lat: number;
-  lng: number;
-  tags: string[];
-  priceLevel?: string;
-}
-
-interface PlacesResult {
-  id: string;
-  displayName: { text: string };
-  formattedAddress: string;
-  location: { latitude: number; longitude: number };
-  currentOpeningHours?: { openNow: boolean };
-  rating?: number;
-  priceLevel?: string;
-  businessStatus?: string;
-}
-
-async function fetchPrinters(lat: number, lng: number): Promise<Printer[]> {
-  const res = await fetch(`/api/printers?lat=${lat}&lng=${lng}`);
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error ?? "Failed to fetch printers");
-
-  return (data.results as PlacesResult[])
-    .filter((p) => p.businessStatus !== "CLOSED_PERMANENTLY")
-    .map((p) => {
-      const elLat = p.location.latitude;
-      const elLng = p.location.longitude;
-      const openNow = p.currentOpeningHours?.openNow;
-      const tags: string[] = [];
-      if (openNow === true) tags.push("Open Now");
-      if (p.rating) tags.push(`⭐ ${p.rating}`);
-      return {
-        id: p.id,
-        name: p.displayName.text,
-        address: p.formattedAddress,
-        distance: getMiles(lat, lng, elLat, elLng),
-        hours: openNow != null ? (openNow ? "Open Now" : "Closed Now") : "Hours not listed",
-        lat: elLat,
-        lng: elLng,
-        tags,
-        priceLevel: p.priceLevel,
-      };
-    })
-    .sort((a, b) => a.distance - b.distance);
 }
 
 export default function PrintersPage() {
@@ -396,7 +313,7 @@ export default function PrintersPage() {
                   display: "flex", alignItems: "center", justifyContent: "center",
                   fontSize: 24, flexShrink: 0,
                 }}>
-                  {getEmoji(p.name)}
+                  {getPrinterEmoji(p.name)}
                 </div>
 
                 <div style={{ flex: 1, minWidth: 0 }}>
