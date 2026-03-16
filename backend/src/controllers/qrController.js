@@ -1,7 +1,8 @@
 const crypto = require("crypto");
 const { pool } = require("../db");
 
-const DEFAULT_FLYERS_URL = "https://www.foodhelpline.org/share";
+const DEFAULT_FLYERS_URL =
+  "http://foodhelpline.org/locations/40.873835,-73.87953999999999?utm_source=resourceFlyer&utm_term=%5B40.873835,-73.87953999999999%5D&utm_content=flyer&utm_campaign=bronx";
 
 async function getOrCreateMyQrCode(req, res) {
   try {
