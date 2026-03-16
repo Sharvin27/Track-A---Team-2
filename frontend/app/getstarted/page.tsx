@@ -133,6 +133,26 @@ export default function GetStartedPage() {
         </div>
       </SectionCard>
 
+      {/* ── Tip bar ───────────────────────────────────────────── */}
+      <div
+        className="anim-fade-up d5"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 10,
+          padding: "14px 20px",
+          borderRadius: 12,
+          background: "rgba(245,200,66,0.10)",
+          border: "1px solid rgba(245,200,66,0.18)",
+        }}
+      >
+        <span style={{ fontSize: 16 }}>&#x2728;</span>
+        <span style={{ fontSize: 13, color: "#7a6a40" }}>
+          <strong style={{ color: "#5f502d" }}>Tip:</strong> Lost or have questions? Click the <strong style={{ color: "#d97706" }}>🍋 chatbot</strong> in the bottom-right corner anytime.
+        </span>
+      </div>
+
     </PageContainer>
   );
 }

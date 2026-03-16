@@ -12,6 +12,19 @@ type ItemResponse<T> = {
   data: T;
 };
 
+export type SearchUser = {
+  id: number;
+  username: string;
+  fullName: string | null;
+};
+
+export async function searchUsers(token: string, q: string) {
+  return apiFetch<ListResponse<SearchUser>>(
+    `/api/messages/users/search?q=${encodeURIComponent(q)}`,
+    { token },
+  );
+}
+
 export async function getThreads(token: string) {
   return apiFetch<ListResponse<DMThread>>("/api/messages/threads", { token });
 }

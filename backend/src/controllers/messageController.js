@@ -93,10 +93,28 @@ async function createThreadMessage(req, res) {
   }
 }
 
+async function searchUsers(req, res) {
+  try {
+    const data = await messageService.searchUsers(
+      req.user.id,
+      req.query.q || "",
+    );
+
+    return res.json({
+      success: true,
+      count: data.length,
+      data,
+    });
+  } catch (error) {
+    return handleError(res, error, "Failed to search users.");
+  }
+}
+
 module.exports = {
   createThread,
   createThreadMessage,
   getThread,
   listThreadMessages,
   listThreads,
+  searchUsers,
 };

@@ -300,7 +300,7 @@ export default function Header({
             minHeight: 36,
             padding: isMobile ? "0 12px" : "0 14px",
             borderRadius: 999,
-            background: "var(--gradient-btn-primary)",
+            background: "linear-gradient(135deg, #22C55E, #16A34A)",
             color: "#ffffff",
             border: "1px solid rgba(34,197,94,0.24)",
             boxShadow: "var(--shadow-card)",
@@ -328,6 +328,34 @@ export default function Header({
           </span>
           Donate
         </a>
+
+        <Link
+          href="/messages"
+          aria-label="Messages"
+          style={{
+            width: 36,
+            height: 36,
+            borderRadius: 10,
+            background: pathname === "/messages" ? "rgba(245,200,66,0.15)" : "rgba(0,0,0,0.04)",
+            border: pathname === "/messages" ? "1px solid rgba(245,200,66,0.25)" : "1px solid rgba(190,155,70,0.18)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <svg
+            width="15"
+            height="15"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke={pathname === "/messages" ? "#d97706" : "#6a5a30"}
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+          </svg>
+        </Link>
 
         <button
           style={{

@@ -1,13 +1,13 @@
 const { pool, query } = require("../db");
 const { createError, normalizeLimit } = require("./serviceUtils");
 
-function userJson(userAlias, photoAlias) {
+function userJson(userAlias, photoAlias, includePhoto = false) {
   return `
     json_build_object(
       'id', ${userAlias}.id,
       'username', ${userAlias}.username,
       'fullName', NULLIF(${userAlias}.full_name, ''),
-      'profilePhotoUrl', ${photoAlias}.image_url
+      'profilePhotoUrl', ${includePhoto ? `${photoAlias}.image_url` : "NULL"}
     )
   `;
 }
@@ -180,7 +180,7 @@ function getMeetupSelect(viewerParam = "$1") {
           'id', members_user.id,
           'username', members_user.username,
           'fullName', NULLIF(members_user.full_name, ''),
-          'profilePhotoUrl', members_photo.image_url,
+          'profilePhotoUrl', NULL,
           'role', meetup_members.role,
           'joinedAt', meetup_members.joined_at
         )

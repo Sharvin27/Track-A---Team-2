@@ -1,13 +1,13 @@
 const { pool, query } = require("../db");
 const { createError, normalizeLimit } = require("./serviceUtils");
 
-function userJson(userAlias, photoAlias) {
+function userJson(userAlias, photoAlias, includePhoto = false) {
   return `
     json_build_object(
       'id', ${userAlias}.id,
       'username', ${userAlias}.username,
       'fullName', NULLIF(${userAlias}.full_name, ''),
-      'profilePhotoUrl', ${photoAlias}.image_url
+      'profilePhotoUrl', ${includePhoto ? `${photoAlias}.image_url` : "NULL"}
     )
   `;
 }
@@ -81,7 +81,7 @@ function getThreadSelect() {
         'id', other_users.id,
         'username', other_users.username,
         'fullName', NULLIF(other_users.full_name, ''),
-        'profilePhotoUrl', other_users.image_url
+        'profilePhotoUrl', NULL
       ) AS other_user,
       last_message.message_text AS last_message_text,
       last_message.created_at AS last_message_at,
@@ -154,6 +154,7 @@ async function listThreads(userId) {
   const result = await query(
     `
       ${getThreadSelect()}
+        AND last_message.created_at IS NOT NULL
       ORDER BY COALESCE(last_message.created_at, threads.updated_at, threads.created_at) DESC
     `,
     [userId],
@@ -315,10 +316,38 @@ async function sendThreadMessage(threadId, userId, messageText) {
   return messages.find((message) => Number(message.id) === Number(result.rows[0].id)) ?? null;
 }
 
+async function searchUsers(currentUserId, searchQuery) {
+  const trimmed = (searchQuery || "").trim();
+  if (!trimmed) {
+    const result = await query(
+      `SELECT id, username, full_name AS "fullName"
+       FROM users
+       WHERE id <> $1
+       ORDER BY username ASC
+       LIMIT 20`,
+      [currentUserId],
+    );
+    return result.rows;
+  }
+
+  const pattern = `%${trimmed}%`;
+  const result = await query(
+    `SELECT id, username, full_name AS "fullName"
+     FROM users
+     WHERE id <> $1
+       AND (username ILIKE $2 OR full_name ILIKE $2)
+     ORDER BY username ASC
+     LIMIT 20`,
+    [currentUserId, pattern],
+  );
+  return result.rows;
+}
+
 module.exports = {
   createOrGetThread,
   getThread,
   listThreadMessages,
   listThreads,
+  searchUsers,
   sendThreadMessage,
 };
